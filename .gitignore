@@ -1,0 +1,45 @@
+# --- Defensive secrets exclusion ---
+# API keys are entered in the HA UI and persisted by HA in
+# addon_data_local/cognee/options.json — NOT in this repo.
+# These patterns are belt-and-suspenders in case a key ever lands
+# in a working file by accident.
+
+.env
+.env.*
+*.env
+*.key
+*.pem
+secrets.yaml
+secrets.yml
+options.json
+**/options.json
+
+# --- Build output ---
+*.tar
+*.tar.gz
+*.tar.xz
+*.log
+
+# --- Python / tooling ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Local-only sandbox (if you ever drop a test compose here) ---
+docker-compose.override.yml
+docker-compose.local.yml

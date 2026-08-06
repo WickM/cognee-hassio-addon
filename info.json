@@ -1,0 +1,6 @@
+{
+  "name": "Cognee Add-on Repository",
+  "version": "0.1.0",
+  "slug": "cognee",
+  "description": "Cognee graph memory as Home Assistant Supervisor add-on"
+}

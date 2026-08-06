@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# s6-overlay cont-init.d/10-config — runs once at boot, before services.
+# Validates addon options, prepares data dirs, logs diagnostics.
+# Tolerant: log + non-zero exit only on fatal misconfig. Best-effort on the rest.
+set +e
+
+echo "[10-config] uid=$(id -u) cwd=$(pwd)"
+echo "[10-config] bashio version: $(bashio --version 2>&1 || echo 'NOT FOUND')"
+echo "[10-config] python: $(command -v python || command -v python3 || echo 'NOT FOUND')"
+echo "[10-config] cognee on PATH: $(command -v cognee || echo 'NOT FOUND')"
+
+# ---- Read options from supervisor (or fall back to env / defaults) ----
+DATA_PATH="$(bashio::config 'data_path' '/share/cognee')"
+LLM_API_KEY="$(bashio::config 'llm_api_key' '')"
+EMBEDDING_API_KEY="$(bashio::config 'embedding_api_key' '')"
+LLM_PROVIDER="$(bashio::config 'llm_provider' 'openai')"
+LLM_MODEL="$(bashio::config 'llm_model' 'minimax/minimax-m3')"
+EMBEDDING_PROVIDER="$(bashio::config 'embedding_provider' 'openai')"
+EMBEDDING_MODEL="$(bashio::config 'embedding_model' 'text-embedding-3-small')"
+EMBEDDING_DIMENSIONS="$(bashio::config 'embedding_dimensions' '1536')"
+COGNEE_PORT="$(bashio::config 'cognee_port' '8000')"
+AGENT_MODE="$(bashio::config 'agent_mode' 'true')"
+LOG_LEVEL="$(bashio::config 'log_level' 'INFO')"
+
+# ---- Validations (fatal) ----
+if [ -z "${LLM_API_KEY}" ]; then
+    bashio::exit.nok "llm_api_key is empty. Set it in the add-on Configuration tab (HA UI)."
+fi
+
+# If embedding_api_key is empty, fall back to llm_api_key (common for gateway setups
+# where one key proxies to multiple model providers).
+if [ -z "${EMBEDDING_API_KEY}" ] && [ -n "${LLM_API_KEY}" ]; then
+    bashio::log.warning "embedding_api_key empty — falling back to llm_api_key"
+    EMBEDDING_API_KEY="${LLM_API_KEY}"
+fi
+
+# ---- Prepare data dirs ----
+mkdir -p "${DATA_PATH}" "${DATA_PATH}/.cognee" "${DATA_PATH}/logs" "${DATA_PATH}/cache"
+chmod -R 777 "${DATA_PATH}"
+echo "[10-config] data dir ready: $(ls -ld ${DATA_PATH})"
+
+# ---- Export to env for the cognee service ----
+# Use bashio::var.export so the s6 service inherits cleanly.
+export DATA_PATH LLM_API_KEY EMBEDDING_API_KEY \
+       LLM_PROVIDER LLM_MODEL \
+       EMBEDDING_PROVIDER EMBEDDING_MODEL EMBEDDING_DIMENSIONS \
+       COGNEE_PORT AGENT_MODE LOG_LEVEL
+
+# Optional base URLs
+LLM_BASE_URL="$(bashio::config 'llm_base_url' '')"
+EMBEDDING_BASE_URL="$(bashio::config 'embedding_base_url' '')"
+[ -n "${LLM_BASE_URL}" ] && export LLM_BASE_URL
+[ -n "${EMBEDDING_BASE_URL}" ] && export EMBEDDING_BASE_URL
+
+# Persist a summary (no secrets) for post-mortem debugging
+{
+    echo "DATA_PATH=${DATA_PATH}"
+    echo "LLM_PROVIDER=${LLM_PROVIDER}"
+    echo "LLM_MODEL=${LLM_MODEL}"
+    echo "LLM_BASE_URL=${LLM_BASE_URL:-<unset>}"
+    echo "EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER}"
+    echo "EMBEDDING_MODEL=${EMBEDDING_MODEL}"
+    echo "EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS}"
+    echo "EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-<unset>}"
+    echo "COGNEE_PORT=${COGNEE_PORT}"
+    echo "AGENT_MODE=${AGENT_MODE}"
+    echo "LOG_LEVEL=${LOG_LEVEL}"
+    echo "LLM_API_KEY_LEN=${#LLM_API_KEY}"
+    echo "EMBEDDING_API_KEY_LEN=${#EMBEDDING_API_KEY}"
+} > "${DATA_PATH}/logs/options.env"
+
+echo "[10-config] options written to ${DATA_PATH}/logs/options.env"
+echo "[10-config] OK — handing off to cognee service"

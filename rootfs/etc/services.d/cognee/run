@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# s6-overlay service: cognee API server
+# Runs in foreground under s6 supervision. Restart strategy in
+# /etc/services.d/cognee/finish (or default) decides on crashes.
+set -e
+
+exec /run.sh

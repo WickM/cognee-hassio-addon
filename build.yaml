@@ -1,0 +1,3 @@
+build:
+  from:
+    amd64: python:3.11-slim-bookworm
