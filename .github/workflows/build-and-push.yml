@@ -7,14 +7,24 @@ on:
       - "v*"
   workflow_dispatch:
 
+# Serialize concurrent runs to avoid hammering GitHub's runner pool.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    # ubuntu-22.04 is an explicit pinned image; on GitHub's free tier the
+    # 'latest' label is sometimes starved for hosted runners — pinning a
+    # specific image pulls from a different pool allocation.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         arch: [amd64]
     steps:
