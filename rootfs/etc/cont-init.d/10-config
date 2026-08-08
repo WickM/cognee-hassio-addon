@@ -4,17 +4,19 @@
 # Tolerant: log + non-zero exit only on fatal misconfig. Best-effort on the rest.
 set +e
 
-# Belt-and-suspenders: source bashio explicitly in case the shebang wasn't honoured.
-# /usr/bin/bashio is the bootstrap symlink; it sources the lib into this shell.
-if [ -f /usr/bin/bashio ]; then
-    # shellcheck disable=SC1091
-    source /usr/bin/bashio || echo "[10-config] WARN: bashio source failed — falling back to jq"
-fi
+
 
 echo "[10-config] uid=$(id -u) cwd=$(pwd)"
-echo "[10-config] bashio version: $(bashio --version 2>&1 || echo 'NOT FOUND')"
+# bashio functions are loaded by the #!/usr/bin/bashio shebang above.
+# Verify it worked by checking for a known function; fall back to jq if not.
+if declare -F bashio::config >/dev/null 2>&1; then
+    echo "[10-config] bashio loaded: OK"
+else
+    echo "[10-config] bashio NOT loaded — _bashio_config() will use jq fallback"
+fi
 echo "[10-config] python: $(command -v python || command -v python3 || echo 'NOT FOUND')"
 echo "[10-config] cognee on PATH: $(command -v cognee || echo 'NOT FOUND')"
+# shebang sets $0 to this script path, which bashio bootstrap needs
 
 # ---- Read options from supervisor (or fall back to env / defaults) ----
 # bashio::config reads from /data/options.json (HA's addon-config-store).
