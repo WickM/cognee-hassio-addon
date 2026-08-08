@@ -1,8 +1,15 @@
-#!/usr/bin/env bash
+#!/usr/bin/bashio
 # s6-overlay cont-init.d/10-config — runs once at boot, before services.
 # Validates addon options, prepares data dirs, logs diagnostics.
 # Tolerant: log + non-zero exit only on fatal misconfig. Best-effort on the rest.
 set +e
+
+# Belt-and-suspenders: source bashio explicitly in case the shebang wasn't honoured.
+# /usr/bin/bashio is the bootstrap symlink; it sources the lib into this shell.
+if [ -f /usr/bin/bashio ]; then
+    # shellcheck disable=SC1091
+    source /usr/bin/bashio || echo "[10-config] WARN: bashio source failed — falling back to jq"
+fi
 
 echo "[10-config] uid=$(id -u) cwd=$(pwd)"
 echo "[10-config] bashio version: $(bashio --version 2>&1 || echo 'NOT FOUND')"
@@ -10,27 +17,53 @@ echo "[10-config] python: $(command -v python || command -v python3 || echo 'NOT
 echo "[10-config] cognee on PATH: $(command -v cognee || echo 'NOT FOUND')"
 
 # ---- Read options from supervisor (or fall back to env / defaults) ----
-DATA_PATH="$(bashio::config 'data_path' '/share/cognee')"
-LLM_API_KEY="$(bashio::config 'llm_api_key' '')"
-EMBEDDING_API_KEY="$(bashio::config 'embedding_api_key' '')"
-LLM_PROVIDER="$(bashio::config 'llm_provider' 'openai')"
-LLM_MODEL="$(bashio::config 'llm_model' 'minimax/minimax-m3')"
-EMBEDDING_PROVIDER="$(bashio::config 'embedding_provider' 'openai')"
-EMBEDDING_MODEL="$(bashio::config 'embedding_model' 'text-embedding-3-small')"
-EMBEDDING_DIMENSIONS="$(bashio::config 'embedding_dimensions' '1536')"
-COGNEE_PORT="$(bashio::config 'cognee_port' '8000')"
-AGENT_MODE="$(bashio::config 'agent_mode' 'true')"
-LOG_LEVEL="$(bashio::config 'log_level' 'INFO')"
+# bashio::config reads from /data/options.json (HA's addon-config-store).
+# If bashio is unavailable for any reason, fall back to jq directly on the same file.
+OPTIONS_FILE="/data/options.json"
+_bashio_config() {
+    local key="$1"
+    local default="$2"
+    if declare -F bashio::config >/dev/null 2>&1; then
+        bashio::config "${key}" "${default}"
+    elif [ -f "${OPTIONS_FILE}" ]; then
+        local val
+        val="$(jq -r --arg k "${key}" 'if (.[$k] == null) then empty else .[$k] end' "${OPTIONS_FILE}" 2>/dev/null)"
+        if [ -z "${val}" ]; then echo "${default}"; else echo "${val}"; fi
+    else
+        echo "${default}"
+    fi
+}
+
+DATA_PATH="$(_bashio_config 'data_path' '/share/cognee')"
+LLM_API_KEY="$(_bashio_config 'llm_api_key' '')"
+EMBEDDING_API_KEY="$(_bashio_config 'embedding_api_key' '')"
+LLM_PROVIDER="$(_bashio_config 'llm_provider' 'openai')"
+LLM_MODEL="$(_bashio_config 'llm_model' 'minimax/minimax-m3')"
+EMBEDDING_PROVIDER="$(_bashio_config 'embedding_provider' 'openai')"
+EMBEDDING_MODEL="$(_bashio_config 'embedding_model' 'text-embedding-3-small')"
+EMBEDDING_DIMENSIONS="$(_bashio_config 'embedding_dimensions' '1536')"
+COGNEE_PORT="$(_bashio_config 'cognee_port' '8000')"
+AGENT_MODE="$(_bashio_config 'agent_mode' 'true')"
+LOG_LEVEL="$(_bashio_config 'log_level' 'INFO')"
 
 # ---- Validations (fatal) ----
 if [ -z "${LLM_API_KEY}" ]; then
-    bashio::exit.nok "llm_api_key is empty. Set it in the add-on Configuration tab (HA UI)."
+    if declare -F bashio::exit.nok >/dev/null 2>&1; then
+        bashio::exit.nok "llm_api_key is empty. Set it in the add-on Configuration tab (HA UI)."
+    else
+        echo "[10-config] FATAL: llm_api_key is empty. Set it in the add-on Configuration tab (HA UI)."
+        exit 1
+    fi
 fi
 
 # If embedding_api_key is empty, fall back to llm_api_key (common for gateway setups
 # where one key proxies to multiple model providers).
 if [ -z "${EMBEDDING_API_KEY}" ] && [ -n "${LLM_API_KEY}" ]; then
-    bashio::log.warning "embedding_api_key empty — falling back to llm_api_key"
+    if declare -F bashio::log.warning >/dev/null 2>&1; then
+        bashio::log.warning "embedding_api_key empty — falling back to llm_api_key"
+    else
+        echo "[10-config] WARN: embedding_api_key empty — falling back to llm_api_key"
+    fi
     EMBEDDING_API_KEY="${LLM_API_KEY}"
 fi
 
@@ -47,8 +80,8 @@ export DATA_PATH LLM_API_KEY EMBEDDING_API_KEY \
        COGNEE_PORT AGENT_MODE LOG_LEVEL
 
 # Optional base URLs
-LLM_BASE_URL="$(bashio::config 'llm_base_url' '')"
-EMBEDDING_BASE_URL="$(bashio::config 'embedding_base_url' '')"
+LLM_BASE_URL="$(_bashio_config 'llm_base_url' '')"
+EMBEDDING_BASE_URL="$(_bashio_config 'embedding_base_url' '')"
 [ -n "${LLM_BASE_URL}" ] && export LLM_BASE_URL
 [ -n "${EMBEDDING_BASE_URL}" ] && export EMBEDDING_BASE_URL
 

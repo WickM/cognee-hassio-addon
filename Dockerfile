@@ -55,13 +55,21 @@ RUN \
     && curl -L -s "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-symlinks-arch.tar.xz" \
         | tar -C / -Jxpf - \
     \
+    # Bashio install — extract whole tree to /usr/lib/bashio, then symlink
+    # the bootstrap binary at /usr/bin/bashio. Scripts that use bashio functions
+    # must use the `#!/usr/bin/env bashio` shebang (not `#!/usr/bin/env bash`),
+    # which makes bashio source itself automatically.
+    # Archive layout: bashio-0.18.1/{lib/bashio, lib/bashio.sh, lib/*.sh, README, LICENSE}
+    # `mv` strips the top-level dir, leaving /usr/lib/bashio/{lib, README, LICENSE}.
+    # Symlink then points at /usr/lib/bashio/lib/bashio (the bootstrap).
     && curl -J -L -o /tmp/bashio.tar.gz \
         "https://github.com/hassio-addons/bashio/archive/${BASHIO_VERSION}.tar.gz" \
-    && mkdir /tmp/bashio \
-    && tar zxvf /tmp/bashio.tar.gz --strip 1 -C /tmp/bashio \
-    \
-    && mv /tmp/bashio/lib /usr/lib/bashio \
-    && ln -s /usr/lib/bashio/bashio /usr/bin/bashio \
+    && mkdir -p /tmp/bashio-extract \
+    && tar zxvf /tmp/bashio.tar.gz --strip 1 -C /tmp/bashio-extract \
+    && mkdir -p /usr/lib/bashio \
+    && mv /tmp/bashio-extract/lib /usr/lib/bashio/lib \
+    && ln -sf /usr/lib/bashio/lib/bashio /usr/bin/bashio \
+    && rm -rf /tmp/bashio-extract /tmp/bashio.tar.gz \
     \
     && curl -L -s -o /usr/bin/tempio \
         "https://github.com/home-assistant/tempio/releases/download/${TEMPIO_VERSION}/tempio_${BUILD_ARCH}" \

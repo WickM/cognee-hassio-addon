@@ -1,8 +1,14 @@
-#!/usr/bin/env bash
+#!/usr/bin/bashio
 # Cognee API server entrypoint.
 # Reads env set by /etc/cont-init.d/10-config, maps to cognee's expected
 # variable names, and launches uvicorn against cognee's FastAPI app.
 set -e
+
+# Belt-and-suspenders: source bashio explicitly in case the shebang wasn't honoured.
+if [ -f /usr/bin/bashio ]; then
+    # shellcheck disable=SC1091
+    source /usr/bin/bashio || echo "[run.sh] WARN: bashio source failed — relying on env from 10-config"
+fi
 
 # ---- Sanity & diagnostics ----
 echo "[run.sh] uid=$(id -u) cwd=$(pwd) PATH=$PATH"
