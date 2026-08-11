@@ -84,3 +84,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [run.sh] CACHE_ROOT_DIRECTORY=/share/cognee/.cognee_cache
 [info] Database storage: /share/cognee/.cognee_system/databases   ← was image-path before
 ```
+
+## v0.1.4 — 2026-08-12
+
+### Changed
+- No functional changes vs. v0.1.3.
+- Version bump to force the Home Assistant add-on store to surface the update
+  (HA only re-checks the GHCR manifest when the version string differs).
+- Resolves a stale rebase state in this repo from prior session.
+
+### Why this release exists
+v0.1.3 (commit `3ca3acf`) already contains the persistence fix
+(`SYSTEM_ROOT_DIRECTORY` / `DATA_ROOT_DIRECTORY` / `CACHE_ROOT_DIRECTORY`).
+If you already updated to v0.1.3 and the log shows
+`Database storage: /share/cognee/.cognee_system/databases`, you're done —
+v0.1.4 brings no new behavior.

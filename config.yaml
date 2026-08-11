@@ -1,5 +1,5 @@
 name: Cognee
-version: "0.1.3"
+version: "0.1.4"
 slug: cognee
 description: Cognee graph memory + retrieval API (sidecar to OpenClaw / any agent)
 url: https://github.com/WickM/cognee-hassio-addon
