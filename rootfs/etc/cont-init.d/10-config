@@ -21,13 +21,58 @@ echo "[10-config] cognee on PATH: $(command -v cognee || echo 'NOT FOUND')"
 # ---- Read options from supervisor (or fall back to env / defaults) ----
 # bashio::config reads from /data/options.json (HA's addon-config-store).
 # If bashio is unavailable for any reason, fall back to jq directly on the same file.
+#
+# v0.1.3 fix: bashio can be loaded (function exists) but every call to the
+# Supervisor API returns 403 forbidden (e.g. sideloaded/static image, missing
+# supervisor token). In that case bashio silently returns the default, even
+# though /data/options.json is mounted and has the real value. We probe
+# once with llm_api_key: if bashio returned empty but jq finds a value,
+# latch jq mode for the rest of the script via a flag file (because the
+# helper is called via $() command substitution → subshell → var
+# assignments don't propagate to the parent).
 OPTIONS_FILE="/data/options.json"
+# v0.1.3: flag file (not in-memory var) because the helper is invoked via
+# $() command substitution → subshell → var assignments don't propagate to
+# the parent. Flag file persists across calls.
+_USE_JQ_FLAG="/tmp/.cognee-use-jq"
+rm -f "${_USE_JQ_FLAG}"
 _bashio_config() {
     local key="$1"
     local default="$2"
+
+    # If jq mode already latched, just use jq
+    if [ -f "${_USE_JQ_FLAG}" ]; then
+        if [ -f "${OPTIONS_FILE}" ]; then
+            local val
+            val="$(jq -r --arg k "${key}" 'if (.[$k] == null) then empty else .[$k] end' "${OPTIONS_FILE}" 2>/dev/null)"
+            if [ -n "${val}" ]; then echo "${val}"; return; fi
+        fi
+        echo "${default}"
+        return
+    fi
+
+    # Try bashio first
     if declare -F bashio::config >/dev/null 2>&1; then
-        bashio::config "${key}" "${default}"
-    elif [ -f "${OPTIONS_FILE}" ]; then
+        local bashio_val
+        bashio_val="$(bashio::config "${key}" "${default}" 2>/dev/null)"
+        # Probe: for llm_api_key, if bashio returned empty but jq finds a
+        # non-empty value, latch jq mode for the rest of the script.
+        if [ "${key}" = "llm_api_key" ] && [ -z "${bashio_val}" ] && [ -f "${OPTIONS_FILE}" ]; then
+            local jq_val
+            jq_val="$(jq -r --arg k "${key}" 'if (.[$k] == null) then empty else .[$k] end' "${OPTIONS_FILE}" 2>/dev/null)"
+            if [ -n "${jq_val}" ]; then
+                echo "[10-config] bashio::config returned empty for llm_api_key but /data/options.json has a value — Supervisor API likely 403'd. Switching to jq fallback for all reads." >&2
+                touch "${_USE_JQ_FLAG}"
+                echo "${jq_val}"
+                return
+            fi
+        fi
+        echo "${bashio_val}"
+        return
+    fi
+
+    # bashio not loaded — use jq
+    if [ -f "${OPTIONS_FILE}" ]; then
         local val
         val="$(jq -r --arg k "${key}" 'if (.[$k] == null) then empty else .[$k] end' "${OPTIONS_FILE}" 2>/dev/null)"
         if [ -z "${val}" ]; then echo "${default}"; else echo "${val}"; fi
