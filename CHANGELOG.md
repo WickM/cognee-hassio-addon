@@ -58,3 +58,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - No file or env-var changes vs. v0.1.1; same `_bashio_config()` fallback.
+
+## v0.1.3 — 2026-08-11
+
+### Fixed
+- **Persistence bug**: cognee 0.3.6 was writing to `.cognee_system/` etc. *inside*
+  the container image (i.e. `/usr/local/lib/python3.11/site-packages/cognee/.cognee_system/`),
+  not the persistent `/share/cognee/` mount. Restart-survival was broken.
+- **Root cause**: my run.sh set `HOME=$DATA_PATH` hoping cognee would discover the
+  mount from cwd/env, but cognee 0.3.x ignores cwd. It reads three explicit env vars
+  via pydantic-settings (see `cognee/base_config.py`):
+  - `SYSTEM_ROOT_DIRECTORY` → sqlite metadata
+  - `DATA_ROOT_DIRECTORY`   → lancedb vector store
+  - `CACHE_ROOT_DIRECTORY`  → caches
+- **Fix**: run.sh now exports these three with absolute paths under `/share/cognee/`.
+  10-config now also creates the matching subdirs (`.cognee_system`, `.data_storage`,
+  `.cognee_cache`) and exports the env vars so the s6 service inherits them.
+- **Defensive**: run.sh `mkdir -p`s the dirs in case 10-config didn't run.
+
+### What you'll see in HA logs after update
+```
+[10-config] data dir ready: drwxrwxrwx ... /share/cognee
+[run.sh] SYSTEM_ROOT_DIRECTORY=/share/cognee/.cognee_system
+[run.sh] DATA_ROOT_DIRECTORY=/share/cognee/.data_storage
+[run.sh] CACHE_ROOT_DIRECTORY=/share/cognee/.cognee_cache
+[info] Database storage: /share/cognee/.cognee_system/databases   ← was image-path before
+```

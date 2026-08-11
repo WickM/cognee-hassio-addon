@@ -70,16 +70,33 @@ if [ -z "${EMBEDDING_API_KEY}" ] && [ -n "${LLM_API_KEY}" ]; then
 fi
 
 # ---- Prepare data dirs ----
-mkdir -p "${DATA_PATH}" "${DATA_PATH}/.cognee" "${DATA_PATH}/logs" "${DATA_PATH}/cache"
+# Three subdirs that cognee 0.3.6 expects under DATA_PATH (see
+# cognee/base_config.py: SYSTEM_ROOT_DIRECTORY, DATA_ROOT_DIRECTORY,
+# CACHE_ROOT_DIRECTORY). Without these, cognee defaults to writing
+# inside the container image — which is wiped on restart.
+mkdir -p "${DATA_PATH}" \
+         "${DATA_PATH}/.cognee" \
+         "${DATA_PATH}/.cognee_system" \
+         "${DATA_PATH}/.data_storage" \
+         "${DATA_PATH}/.cognee_cache" \
+         "${DATA_PATH}/logs"
 chmod -R 777 "${DATA_PATH}"
 echo "[10-config] data dir ready: $(ls -ld ${DATA_PATH})"
 
 # ---- Export to env for the cognee service ----
 # Use bashio::var.export so the s6 service inherits cleanly.
+# Also export the three cognee root dirs so run.sh / s6 service inherits them
+# (defensive: run.sh sets them itself with : ${DATA_PATH:=/share/cognee}
+# fallback, but exporting here avoids any env-pass-through issue with s6).
+export SYSTEM_ROOT_DIRECTORY="${DATA_PATH}/.cognee_system"
+export DATA_ROOT_DIRECTORY="${DATA_PATH}/.data_storage"
+export CACHE_ROOT_DIRECTORY="${DATA_PATH}/.cognee_cache"
+
 export DATA_PATH LLM_API_KEY EMBEDDING_API_KEY \
        LLM_PROVIDER LLM_MODEL \
        EMBEDDING_PROVIDER EMBEDDING_MODEL EMBEDDING_DIMENSIONS \
-       COGNEE_PORT AGENT_MODE LOG_LEVEL
+       COGNEE_PORT AGENT_MODE LOG_LEVEL \
+       SYSTEM_ROOT_DIRECTORY DATA_ROOT_DIRECTORY CACHE_ROOT_DIRECTORY
 
 # Optional base URLs
 LLM_BASE_URL="$(_bashio_config 'llm_base_url' '')"

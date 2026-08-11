@@ -11,6 +11,9 @@ echo "[run.sh] uid=$(id -u) cwd=$(pwd) PATH=$PATH"
 echo "[run.sh] python: $(command -v python || command -v python3 || echo 'NOT FOUND')"
 echo "[run.sh] cognee on PATH: $(command -v cognee || echo 'NOT FOUND')"
 echo "[run.sh] DATA_PATH=${DATA_PATH:-<unset>}"
+echo "[run.sh] SYSTEM_ROOT_DIRECTORY=${SYSTEM_ROOT_DIRECTORY:-<unset>}"
+echo "[run.sh] DATA_ROOT_DIRECTORY=${DATA_ROOT_DIRECTORY:-<unset>}"
+echo "[run.sh] CACHE_ROOT_DIRECTORY=${CACHE_ROOT_DIRECTORY:-<unset>}"
 echo "[run.sh] COGNEE_PORT=${COGNEE_PORT:-8000} LLM_PROVIDER=${LLM_PROVIDER:-<unset>} LLM_MODEL=${LLM_MODEL:-<unset>}"
 echo "[run.sh] EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-<unset>} EMBEDDING_MODEL=${EMBEDDING_MODEL:-<unset>} DIM=${EMBEDDING_DIMENSIONS:-<unset>}"
 echo "[run.sh] AGENT_MODE=${AGENT_MODE:-false} LOG_LEVEL=${LOG_LEVEL:-INFO}"
@@ -45,9 +48,20 @@ fi
 
 # Cognee data root — point all file-based backends (sqlite, kuzu, lancedb)
 # at the persistent /share/cognee mount so restart-survival is guaranteed.
+# Cognee 0.3.6 reads these three env vars (see cognee/base_config.py):
+#   - SYSTEM_ROOT_DIRECTORY  → sqlite metadata
+#   - DATA_ROOT_DIRECTORY    → lancedb vector store
+#   - CACHE_ROOT_DIRECTORY   → caches
+# Without these, cognee falls back to .cognee_system / .data_storage /
+# .cognee_cache *relative to the cognee package directory* — which is
+# inside the container image and is wiped on restart.
+export SYSTEM_ROOT_DIRECTORY="${DATA_PATH}/.cognee_system"
+export DATA_ROOT_DIRECTORY="${DATA_PATH}/.data_storage"
+export CACHE_ROOT_DIRECTORY="${DATA_PATH}/.cognee_cache"
 export HOME="${DATA_PATH}"
-# Cognee 0.3+ uses .data/ subdirectory by default; mkdir first.
-mkdir -p "${DATA_PATH}/.data"
+# Create all three before uvicorn starts (pydantic-settings validates
+# that they're absolute; cognee's lifespan will fail if dirs missing).
+mkdir -p "${SYSTEM_ROOT_DIRECTORY}" "${DATA_ROOT_DIRECTORY}" "${CACHE_ROOT_DIRECTORY}" "${DATA_PATH}/.data" "${DATA_PATH}/logs"
 
 # ---- Launch ----
 PY="$(command -v python || command -v python3)"
