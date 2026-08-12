@@ -33,8 +33,10 @@ export LLM_API_KEY="${LLM_API_KEY:-}"
 export EMBEDDING_API_KEY="${EMBEDDING_API_KEY:-${LLM_API_KEY:-}}"
 
 # Provider + model hints — cognee uses these to pick the right client
+# v0.1.5: defaults aligned with config.yaml schema defaults so that even if
+# 10-config's bashio/jq reads failed, the values are still correct.
 export LLM_PROVIDER="${LLM_PROVIDER:-openai}"
-export LLM_MODEL="${LLM_MODEL:-gpt-4o-mini}"
+export LLM_MODEL="${LLM_MODEL:-minimax/minimax-m3}"
 if [ -n "${LLM_BASE_URL:-}" ]; then
     export LLM_ENDPOINT="${LLM_BASE_URL}"
 fi

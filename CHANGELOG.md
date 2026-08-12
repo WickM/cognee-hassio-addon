@@ -5,6 +5,42 @@ All notable changes to this add-on are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2026-08-12
+
+### Fixed
+
+- **`_bashio_config()` default-fallback**: when bashio returned an empty
+  string (silent Supervisor 403 / fallback) for non-`llm_api_key` keys
+  like `llm_model`, the user-supplied default was ignored, so the env
+  vars `LLM_MODEL`, `LLM_PROVIDER`, etc. propagated to cognee as
+  `<unset>` — even though config.yaml had explicit defaults. Cognee's
+  LLMConfig then errored with `Missing credentials` because it could
+  not resolve a model. The helper now applies the default locally
+  when bashio returns empty.
+
+- **`run.sh` default mismatch**: the fallback defaults in run.sh
+  (`gpt-4o-mini`, no embedding dims) did not match the config.yaml
+  schema defaults (`minimax/minimax-m3`, 1536 dims). Now they match,
+  so even if 10-config failed entirely, cognee still gets the
+  kilocode-gateway / voyage-compatible defaults the user expects.
+
+## [0.1.4] - 2026-08-11
+
+### Fixed
+
+- **Persistence**: cognee 0.3.6's `base_config.py` reads three env
+  vars (`SYSTEM_ROOT_DIRECTORY`, `DATA_ROOT_DIRECTORY`,
+  `CACHE_ROOT_DIRECTORY`) for sqlite/lancedb/kuzu storage. Without
+  them set, cognee falls back to `.cognee_system/` relative to its
+  package directory — i.e. inside the container image, wiped on every
+  addon restart. `run.sh` now exports all three pointing at
+  `${DATA_PATH}` (`/share/cognee/.cognee_system` etc.), and 10-config
+  creates the dirs at boot.
+
+### Notes
+
+- No schema change. No HA UI change. Pure server-side fix.
+
 ## [0.1.3] - 2026-08-11
 
 ### Fixed

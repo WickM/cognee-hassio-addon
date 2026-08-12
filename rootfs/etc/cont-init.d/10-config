@@ -67,6 +67,14 @@ _bashio_config() {
                 return
             fi
         fi
+        # v0.1.5 fix: bashio may return an empty string even when a default
+        # was supplied (silent 403 / fallback). If we got nothing and a
+        # default exists, use it instead — otherwise export SYSTEM_ROOT etc.
+        # downstream end up <unset>. This is the bug that made yesterday's
+        # log show "LLM_MODEL=<unset>" despite config.yaml having a default.
+        if [ -z "${bashio_val}" ] && [ -n "${default}" ]; then
+            bashio_val="${default}"
+        fi
         echo "${bashio_val}"
         return
     fi
