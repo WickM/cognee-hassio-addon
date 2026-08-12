@@ -5,6 +5,35 @@ All notable changes to this add-on are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-08-12
+
+### Fixed
+
+- **s6-overlay env-pass-through bug**: cont-init scripts run as a
+  separate process tree under s6-supervision, so the `export LLM_API_KEY=...`
+  statements in `/etc/cont-init.d/10-config` never reach the supervised
+  service. Symptom: cognee's startup log shows
+  `LLM_PROVIDER=<unset> LLM_MODEL=<unset>`, and the first call to
+  `/api/v1/settings` raises
+  `pydantic_core.ValidationError: llm.api_key Input should be a valid string`.
+  The s6 service-run script now re-reads `/data/options.json` and sources
+  it into the service environment with `set -a; . <tmpfile>; set +a`.
+  The tmpfile is mode 0600 and removed immediately after, so secrets
+  don't linger on disk (HA's `/data/options.json` itself is the
+  authoritative store and is the only persistent copy).
+
+- **JWT-safe value transport**: `export KEY=value` from jq output would
+  truncate values containing `=` (e.g. `eyJhbGc….kUT9spvaU-L64c=`) at
+  the first `=`. The new approach uses `set -a; . file; set +a` which
+  parses each line as a complete assignment regardless of `=` chars in
+  the value.
+
+### Notes
+
+- No schema change. No HA UI change. Pure server-side fix.
+- This is the fix for the "cognee starts then crashes on first
+  settings call" symptom visible in the v0.1.5 addon log.
+
 ## [0.1.5] - 2026-08-12
 
 ### Fixed

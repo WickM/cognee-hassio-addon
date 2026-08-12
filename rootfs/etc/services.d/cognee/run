@@ -4,4 +4,24 @@
 # /etc/services.d/cognee/finish (or default) decides on crashes.
 set -e
 
+# v0.1.6: cont-init runs as a separate process tree, so its `export`
+# statements never reach this service. Re-read /data/options.json here
+# (HA's addon-config-store, already on disk at this point) and re-export
+# each key so run.sh / cognee can see LLM_API_KEY etc. Without this the
+# cognee process starts with LLM_API_KEY=<unset> → pydantic SettingsDict
+# validation error → immediate shutdown.
+#
+# Use a tmpfile + `set -a; . file` instead of `export KEY=val` so values
+# containing '=' or other shell-special chars (e.g. JWT tokens like
+# 'eyJhbGc…=') survive intact. The temp file is mode 0600 and rm'd after.
+if [ -f /data/options.json ]; then
+    _ENV_TMP="$(mktemp)"
+    chmod 600 "${_ENV_TMP}"
+    jq -r 'to_entries[] | select(.value != null and .value != "") | "\(.key | ascii_upcase)=\(.value)"' /data/options.json 2>/dev/null > "${_ENV_TMP}"
+    set -a
+    . "${_ENV_TMP}"
+    set +a
+    rm -f "${_ENV_TMP}"
+fi
+
 exec /run.sh
