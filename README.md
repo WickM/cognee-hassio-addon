@@ -4,7 +4,9 @@ Home Assistant Supervisor add-on that runs the [Cognee](https://github.com/topot
 graph-memory API server as a sidecar — designed to live next to
 [OpenClaw](https://github.com/openclaw/openclaw) or any agent framework.
 
-> **Status:** v0.2.0 — Cognee 1.4.2 with first-class `openai_compatible`
+> **Status:** v0.2.1 — Cognee 1.4.2, auth bypass for single-user addon,
+> robust `EMBEDDING_ENDPOINT` / `LLM_ENDPOINT` resolution from the v0.1.x
+> `*_base_url` fields. See [CHANGELOG](CHANGELOG.md) for the full diff.
 > embedding support. Defaults stay on Kilo/OpenAI for safe upgrades;
 > see the [Kilo + Voyage recipe](#b-voyage-ai-via-openai_compatible) for
 > switching embeddings to Voyage (`voyage-4-large`, 1024-dim).
@@ -58,8 +60,8 @@ Side-by-side — separate addon, shared `/share/cognee` volume — gives:
 | `embedding_provider` | str | `openai` | Same as above. |
 | `embedding_model` | str | `text-embedding-3-small` | 1536-dim, cheap, good for graph. |
 | `embedding_dimensions` | int? | `1536` | Must match the model. |
-| `embedding_base_url` | str? | `https://api.kilo.ai/api/gateway/v1` | Same as LLM base URL by default. (v0.1.x field, still used by the `openai` provider.) |
-| `embedding_endpoint` | str? | *(empty)* | **v0.2.0** — cognee 1.x variable name. **Required** when `embedding_provider=openai_compatible`. For `openai` provider, leave blank and `embedding_base_url` is used instead. |
+| `embedding_base_url` | str? | `https://api.kilo.ai/api/gateway/v1` | Same as LLM base URL by default. (v0.1.x field, still used by the `openai` provider and as the v0.2.1 fallback for `embedding_endpoint`.) |
+| `embedding_endpoint` | str? | *(empty)* | **v0.2.0** — cognee 1.x variable name. **Required** when `embedding_provider=openai_compatible`. For `openai` provider, leave blank and `embedding_base_url` is used instead. v0.2.1 resolves the endpoint from `embedding_base_url` automatically when this is empty, so existing v0.1.x configs keep working without edits. |
 | `cognee_port` | int | `8000` | API listen port. |
 | `agent_mode` | bool | `true` | Auto-shutdown when no agent connected. |
 | `log_level` | str | `INFO` | `DEBUG`/`INFO`/`WARNING`/`ERROR`. |
@@ -132,6 +134,22 @@ embedding_model: nomic-embed-text
 embedding_dimensions: 768
 embedding_base_url: http://homeassistant.local:11434/v1
 ```
+
+## Authentication (v0.2.1)
+
+Cognee 1.x enables multi-tenant + authentication by default, which would
+break a single-user hassio-addon (every request gets `401 Unauthorized`
+unless a Bearer token is supplied). v0.2.1 bypasses both flags at startup:
+
+```bash
+export ENABLE_BACKEND_ACCESS_CONTROL=false
+export REQUIRE_AUTHENTICATION=false
+```
+
+Both must be set: `REQUIRE_AUTHENTICATION=false` alone is silently
+overridden by cognee when backend access control stays on. If you want
+multi-tenant + auth, remove these two exports from `rootfs/run.sh` and
+configure cognee's auth router manually.
 
 ## Architecture
 

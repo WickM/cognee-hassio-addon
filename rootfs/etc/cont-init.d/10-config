@@ -153,15 +153,23 @@ export DATA_PATH LLM_API_KEY EMBEDDING_API_KEY \
        LLM_PROVIDER LLM_MODEL \
        EMBEDDING_PROVIDER EMBEDDING_MODEL EMBEDDING_DIMENSIONS \
        EMBEDDING_ENDPOINT \
+       ENABLE_BACKEND_ACCESS_CONTROL REQUIRE_AUTHENTICATION \
        COGNEE_PORT AGENT_MODE LOG_LEVEL \
        SYSTEM_ROOT_DIRECTORY DATA_ROOT_DIRECTORY CACHE_ROOT_DIRECTORY
 
 # Optional base URLs (kept for backwards-compat with v0.1.x configs and
 # the `openai` provider; `openai_compatible` uses EMBEDDING_ENDPOINT above).
+# v0.2.1: also pre-set LLM_ENDPOINT / EMBEDDING_ENDPOINT here if the user
+# only provided the *_BASE_URL forms. run.sh does the same fallback as a
+# safety net; setting it here too makes `options.env` truthful.
 LLM_BASE_URL="$(_bashio_config 'llm_base_url' '')"
 EMBEDDING_BASE_URL="$(_bashio_config 'embedding_base_url' '')"
 [ -n "${LLM_BASE_URL}" ] && export LLM_BASE_URL
 [ -n "${EMBEDDING_BASE_URL}" ] && export EMBEDDING_BASE_URL
+[ -z "${LLM_ENDPOINT:-}" ] && [ -n "${LLM_BASE_URL:-}" ] && export LLM_ENDPOINT="${LLM_BASE_URL}"
+[ -z "${EMBEDDING_ENDPOINT:-}" ] && [ -n "${EMBEDDING_BASE_URL:-}" ] && export EMBEDDING_ENDPOINT="${EMBEDDING_BASE_URL}"
+# Re-export so the summary block sees the resolved value
+export LLM_ENDPOINT EMBEDDING_ENDPOINT
 
 # Persist a summary (no secrets) for post-mortem debugging
 {
@@ -169,11 +177,14 @@ EMBEDDING_BASE_URL="$(_bashio_config 'embedding_base_url' '')"
     echo "LLM_PROVIDER=${LLM_PROVIDER}"
     echo "LLM_MODEL=${LLM_MODEL}"
     echo "LLM_BASE_URL=${LLM_BASE_URL:-<unset>}"
+    echo "LLM_ENDPOINT=${LLM_ENDPOINT:-<fallback-via-run.sh}"
     echo "EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER}"
     echo "EMBEDDING_MODEL=${EMBEDDING_MODEL}"
     echo "EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS}"
-    echo "EMBEDDING_ENDPOINT=${EMBEDDING_ENDPOINT:-<unset>}"
+    echo "EMBEDDING_ENDPOINT=${EMBEDDING_ENDPOINT:-<fallback-via-run.sh>}"
     echo "EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-<unset>}"
+    echo "ENABLE_BACKEND_ACCESS_CONTROL=${ENABLE_BACKEND_ACCESS_CONTROL:-<set-in-run.sh>}"
+    echo "REQUIRE_AUTHENTICATION=${REQUIRE_AUTHENTICATION:-<set-in-run.sh>}"
     echo "COGNEE_PORT=${COGNEE_PORT}"
     echo "AGENT_MODE=${AGENT_MODE}"
     echo "LOG_LEVEL=${LOG_LEVEL}"

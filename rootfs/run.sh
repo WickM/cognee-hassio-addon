@@ -4,6 +4,16 @@
 # variable names, and launches uvicorn against cognee's FastAPI app.
 set -e
 
+# ---- v0.2.1: cognee 1.x default auth bypass ----
+# Cognee 1.x enables multi-tenant + auth by default. For a single-user
+# hassio-addon we want neither. Both flags must be set BEFORE any cognee
+# import (they're read at module-import time by get_authenticated_user.py).
+# Setting only REQUIRE_AUTHENTICATION=false is not enough — cognee forces
+# it back on if ENABLE_BACKEND_ACCESS_CONTROL stays true. See
+# cognee/modules/users/methods/get_authenticated_user.py::_resolve_auth_posture.
+export ENABLE_BACKEND_ACCESS_CONTROL=false
+export REQUIRE_AUTHENTICATION=false
+
 
 
 # ---- Sanity & diagnostics ----
@@ -44,14 +54,23 @@ fi
 export EMBEDDING_PROVIDER="${EMBEDDING_PROVIDER:-openai}"
 export EMBEDDING_MODEL="${EMBEDDING_MODEL:-text-embedding-3-small}"
 export EMBEDDING_DIMENSIONS="${EMBEDDING_DIMENSIONS:-1536}"
-# v0.2.0: cognee 1.x reads `EMBEDDING_ENDPOINT` for `openai_compatible`.
-# Prefer the explicit endpoint if set, else fall back to `EMBEDDING_BASE_URL`
-# (kept for backwards-compat with v0.1.x configs and the `openai` provider).
-if [ -n "${EMBEDDING_ENDPOINT:-}" ]; then
-    :  # already exported by 10-config / s6 service-run
-elif [ -n "${EMBEDDING_BASE_URL:-}" ]; then
+# v0.2.1: cognee 1.x reads `EMBEDDING_ENDPOINT` for `openai_compatible`.
+# Resolve *before* exporting so we can log the final value. Prefer the
+# explicit endpoint (set via v0.2.0+ schema field `embedding_endpoint`),
+# else fall back to `EMBEDDING_BASE_URL` (v0.1.x compat + the `openai`
+# provider, which uses the same field name).
+if [ -z "${EMBEDDING_ENDPOINT:-}" ] && [ -n "${EMBEDDING_BASE_URL:-}" ]; then
     export EMBEDDING_ENDPOINT="${EMBEDDING_BASE_URL}"
 fi
+export EMBEDDING_ENDPOINT
+
+# v0.2.1: same for LLM. Kilo is exposed OpenAI-compatible but the `openai`
+# provider works against any /v1/chat/completions endpoint via LLM_BASE_URL.
+# If the user picked `openai_compatible`, cognee 1.x also wants LLM_ENDPOINT.
+if [ -z "${LLM_ENDPOINT:-}" ] && [ -n "${LLM_BASE_URL:-}" ]; then
+    export LLM_ENDPOINT="${LLM_BASE_URL}"
+fi
+export LLM_ENDPOINT
 
 # Cognee data root — point all file-based backends (sqlite, kuzu, lancedb)
 # at the persistent /share/cognee mount so restart-survival is guaranteed.
@@ -72,6 +91,8 @@ mkdir -p "${SYSTEM_ROOT_DIRECTORY}" "${DATA_ROOT_DIRECTORY}" "${CACHE_ROOT_DIREC
 
 # ---- Launch ----
 PY="$(command -v python || command -v python3)"
+echo "[run.sh] effective endpoints: LLM_ENDPOINT=${LLM_ENDPOINT:-<unset>} EMBEDDING_ENDPOINT=${EMBEDDING_ENDPOINT:-<unset>}"
+echo "[run.sh] auth bypass: ENABLE_BACKEND_ACCESS_CONTROL=${ENABLE_BACKEND_ACCESS_CONTROL} REQUIRE_AUTHENTICATION=${REQUIRE_AUTHENTICATION}"
 echo "[run.sh] starting cognee API on 0.0.0.0:${COGNEE_PORT}"
 echo "[run.sh] agent_mode=${AGENT_MODE} (auto-shutdown when no agent is active)"
 

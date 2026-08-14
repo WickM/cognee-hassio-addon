@@ -5,6 +5,51 @@ All notable changes to this add-on are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-08-14
+
+### Fixed — cognee 1.x default auth + endpoint resolution
+
+Cognee 1.x enables multi-tenant + auth by default. For a single-user
+hassio-addon this means every request (including OpenClaw's plugin) gets
+`401 Unauthorized` until a Bearer token is supplied. `0.2.1` bypasses
+both flags before any cognee import so the addon behaves like the
+`0.1.x` series (no auth, single-user).
+
+- `rootfs/run.sh`: `export ENABLE_BACKEND_ACCESS_CONTROL=false` and
+  `export REQUIRE_AUTHENTICATION=false` immediately at startup. Both
+  must be set: `REQUIRE_AUTHENTICATION=false` alone is silently
+  overridden by cognee when backend access control is on. See
+  `cognee/modules/users/methods/get_authenticated_user.py::_resolve_auth_posture`.
+
+### Fixed — `EMBEDDING_ENDPOINT` / `LLM_ENDPOINT` not resolved reliably
+
+Symptom in `/share/cognee/logs/options.env`:
+`EMBEDDING_ENDPOINT=<unset>` even when `embedding_base_url` was set in HA.
+Cause: `10-config` only sets `EMBEDDING_ENDPOINT` if `embedding_endpoint`
+was present in HA options (new v0.2.0 schema field). For users who
+configured `embedding_base_url` (the v0.1.x field) the variable was
+empty and cognee saw no endpoint.
+
+- `rootfs/etc/cont-init.d/10-config`: explicit fallback
+  `EMBEDDING_BASE_URL → EMBEDDING_ENDPOINT` and `LLM_BASE_URL → LLM_ENDPOINT`.
+- `rootfs/run.sh`: same fallback applied as a safety net, with
+  diagnostic log lines so the final resolved endpoint is visible.
+- `options.env` now includes `ENABLE_BACKEND_ACCESS_CONTROL`,
+  `REQUIRE_AUTHENTICATION`, and the resolved `LLM_ENDPOINT` /
+  `EMBEDDING_ENDPOINT` (or `<fallback-via-run.sh>` marker) for
+  post-mortem verification.
+
+### Verified
+
+With `embedding_provider: openai_compatible`,
+`embedding_model: voyage-4-large`,
+`embedding_base_url: https://api.voyageai.com/v1`,
+`embedding_dimensions: 1024`, and either the `pa-...` Voyage key in
+`embedding_api_key` or the LLM key as fallback, the addon now boots
+into cognee 1.4.2 with no `authentication=required` block, and
+embedding calls hit `https://api.voyageai.com/v1/embeddings` directly
+(no LiteLLM detour).
+
 ## [0.2.0] - 2026-08-14
 
 ### Changed — cognee 0.3.6 → 1.4.2
