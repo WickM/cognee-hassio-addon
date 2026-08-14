@@ -97,6 +97,10 @@ LLM_MODEL="$(_bashio_config 'llm_model' 'minimax/minimax-m3')"
 EMBEDDING_PROVIDER="$(_bashio_config 'embedding_provider' 'openai')"
 EMBEDDING_MODEL="$(_bashio_config 'embedding_model' 'text-embedding-3-small')"
 EMBEDDING_DIMENSIONS="$(_bashio_config 'embedding_dimensions' '1536')"
+# v0.2.0: read new `embedding_endpoint` (cognee 1.x variable name) — used
+# when `embedding_provider=openai_compatible`. Falls back to `embedding_base_url`
+# in run.sh if unset, so v0.1.x configs keep working.
+EMBEDDING_ENDPOINT="$(_bashio_config 'embedding_endpoint' '')"
 COGNEE_PORT="$(_bashio_config 'cognee_port' '8000')"
 AGENT_MODE="$(_bashio_config 'agent_mode' 'true')"
 LOG_LEVEL="$(_bashio_config 'log_level' 'INFO')"
@@ -148,10 +152,12 @@ export CACHE_ROOT_DIRECTORY="${DATA_PATH}/.cognee_cache"
 export DATA_PATH LLM_API_KEY EMBEDDING_API_KEY \
        LLM_PROVIDER LLM_MODEL \
        EMBEDDING_PROVIDER EMBEDDING_MODEL EMBEDDING_DIMENSIONS \
+       EMBEDDING_ENDPOINT \
        COGNEE_PORT AGENT_MODE LOG_LEVEL \
        SYSTEM_ROOT_DIRECTORY DATA_ROOT_DIRECTORY CACHE_ROOT_DIRECTORY
 
-# Optional base URLs
+# Optional base URLs (kept for backwards-compat with v0.1.x configs and
+# the `openai` provider; `openai_compatible` uses EMBEDDING_ENDPOINT above).
 LLM_BASE_URL="$(_bashio_config 'llm_base_url' '')"
 EMBEDDING_BASE_URL="$(_bashio_config 'embedding_base_url' '')"
 [ -n "${LLM_BASE_URL}" ] && export LLM_BASE_URL
@@ -166,6 +172,7 @@ EMBEDDING_BASE_URL="$(_bashio_config 'embedding_base_url' '')"
     echo "EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER}"
     echo "EMBEDDING_MODEL=${EMBEDDING_MODEL}"
     echo "EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS}"
+    echo "EMBEDDING_ENDPOINT=${EMBEDDING_ENDPOINT:-<unset>}"
     echo "EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-<unset>}"
     echo "COGNEE_PORT=${COGNEE_PORT}"
     echo "AGENT_MODE=${AGENT_MODE}"

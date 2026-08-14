@@ -1,5 +1,5 @@
 name: Cognee
-version: "0.1.6"
+version: "0.2.0"
 slug: cognee
 description: Cognee graph memory + retrieval API (sidecar to OpenClaw / any agent)
 url: https://github.com/WickM/cognee-hassio-addon
@@ -29,6 +29,12 @@ schema:
   embedding_provider: str
   embedding_model: str
   embedding_dimensions: int?
+  # v0.2.0: `embedding_endpoint` is the cognee-1.x variable name. Optional;
+  # when `embedding_provider=openai_compatible`, this is REQUIRED (cognee
+  # does NOT fall back to `embedding_base_url` for `openai_compatible`).
+  # `embedding_base_url` is kept for backwards-compat with v0.1.x configs
+  # and with the `openai` provider (which does fall back to it).
+  embedding_endpoint: str?
   embedding_base_url: str?
 
   # Addon behavior

@@ -4,7 +4,10 @@ Home Assistant Supervisor add-on that runs the [Cognee](https://github.com/topot
 graph-memory API server as a sidecar — designed to live next to
 [OpenClaw](https://github.com/openclaw/openclaw) or any agent framework.
 
-> **Status:** v0.1.0 — Phase 0/1 (Phase 0 is the file you're looking at).
+> **Status:** v0.2.0 — Cognee 1.4.2 with first-class `openai_compatible`
+> embedding support. Defaults stay on Kilo/OpenAI for safe upgrades;
+> see the [Kilo + Voyage recipe](#b-voyage-ai-via-openai_compatible) for
+> switching embeddings to Voyage (`voyage-4-large`, 1024-dim).
 > Restart-survival, JWT-secret persistence, and 7-day capacity validation
 > are still pending. See [`brain/plans/2026-08-06-cognee-memory-hassio-addon.md`](https://github.com/WickM/openclaw-backup)
 > for the full plan.
@@ -55,7 +58,8 @@ Side-by-side — separate addon, shared `/share/cognee` volume — gives:
 | `embedding_provider` | str | `openai` | Same as above. |
 | `embedding_model` | str | `text-embedding-3-small` | 1536-dim, cheap, good for graph. |
 | `embedding_dimensions` | int? | `1536` | Must match the model. |
-| `embedding_base_url` | str? | `https://api.kilo.ai/api/gateway/v1` | Same as LLM base URL by default. |
+| `embedding_base_url` | str? | `https://api.kilo.ai/api/gateway/v1` | Same as LLM base URL by default. (v0.1.x field, still used by the `openai` provider.) |
+| `embedding_endpoint` | str? | *(empty)* | **v0.2.0** — cognee 1.x variable name. **Required** when `embedding_provider=openai_compatible`. For `openai` provider, leave blank and `embedding_base_url` is used instead. |
 | `cognee_port` | int | `8000` | API listen port. |
 | `agent_mode` | bool | `true` | Auto-shutdown when no agent connected. |
 | `log_level` | str | `INFO` | `DEBUG`/`INFO`/`WARNING`/`ERROR`. |
@@ -81,24 +85,34 @@ embedding_dimensions: 1536
 embedding_base_url: https://api.kilo.ai/api/gateway/v1
 ```
 
-### B. Voyage AI + OpenAI
+### B. Voyage AI via `openai_compatible` (v0.2.0+)
 
-If you want high-quality embeddings (voyage-3-large) and a separate
-LLM key:
+LLM stays on Kilo, embeddings go directly to Voyage via cognee's
+`openai_compatible` provider. Cognee 1.x talks to any OpenAI-spec
+`/v1/embeddings` endpoint with no LiteLLM indirection.
 
 ```yaml
-llm_api_key: <openai-key>
-embedding_api_key: <voyage-key>
+llm_api_key: <your-kilocode-key>
+embedding_api_key: <your-voyage-key>     # Voyage keys start with `pa-`
 
 llm_provider: openai
-llm_model: gpt-4o-mini
-# llm_base_url: leave blank (default OpenAI)
+llm_model: minimax/minimax-m3
+llm_base_url: https://api.kilo.ai/api/gateway/v1
 
-embedding_provider: voyage
-embedding_model: voyage-3-large
+embedding_provider: openai_compatible
+embedding_model: voyage-4-large          # 1024-dim default; use voyage-3-large if you want cheaper
 embedding_dimensions: 1024
-# embedding_base_url: leave blank (default Voyage)
+embedding_endpoint: https://api.voyageai.com/v1
+# embedding_base_url: leave blank — openai_compatible uses embedding_endpoint
 ```
+
+After saving, **rebuild the vector index** if you previously had a
+different embedding model/dimension (delete `/share/cognee/.data_storage/lancedb_data`).
+
+### B'. Legacy Voyage + OpenAI LLM (v0.1.x recipe — no longer recommended)
+
+Kept for historical reference. The `voyage` provider on cognee 0.3.6
+crashed with tiktoken errors; the v0.2.0 recipe above replaces this.
 
 ### C. Local Ollama
 
@@ -162,8 +176,10 @@ project.
 - [ ] **7-day capacity validation** — Phase 5.
 - [ ] **Multi-arch** — currently `amd64` only. Add `aarch64` when a
       Pi-based HA host is in play.
-- [ ] **Cognee version pin** — currently `0.3.6`. Bump intentionally,
-      test before publish.
+- [ ] **Cognee version pin** — bumped to `1.4.2` in v0.2.0 (LadybugDB as
+      graph backend, `openai_compatible` for embeddings). Validate
+      `voyage-4-large` embeddings against a fresh vector index before
+      shipping further.
 
 ## License
 

@@ -5,6 +5,66 @@ All notable changes to this add-on are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-08-14
+
+### Changed — cognee 0.3.6 → 1.4.2
+
+- Pin Cognee to `1.4.2`. The `0.3.x → 1.x` bump is required to use Voyage
+  (or any non-OpenAI embedding model): `0.3.6` runs every embedding through
+  a tiktoken tokenizer that only knows OpenAI model names and crashes with
+  `'Could not automatically map <model> to a tokeniser'`. `1.x` adds
+  `openai_compatible` as a first-class provider that talks any
+  OpenAI-spec `/v1/embeddings` endpoint directly (Voyage, OpenRouter, etc.).
+- Graph-database backend: `0.3.6` shipped Kuzu directly; `1.4.2` uses
+  **LadybugDB** (Kuzu fork) as the primary backend, pulled in as a
+  transitive cognee dependency. **Do not** add `pip install kuzu` to the
+  Dockerfile — that would install the legacy package and mix incompatible
+  backends with the Ladybug adapter cognee uses internally. The provider
+  name `kuzu` is still accepted by cognee and routed to the Ladybug
+  adapter, so no config change is needed there.
+
+### Added — `embedding_endpoint` (cognee 1.x variable name)
+
+- `embedding_endpoint: str?` added to `config.yaml` schema. Required when
+  `embedding_provider: openai_compatible` (cognee does not fall back to
+  `embedding_base_url` for that provider).
+- `embedding_base_url` is kept for backwards-compat with `openai` provider
+  and existing v0.1.x configs.
+- `rootfs/etc/cont-init.d/10-config` reads the new field and exports
+  `EMBEDDING_ENDPOINT` to env.
+- `rootfs/run.sh` prefers `EMBEDDING_ENDPOINT` and falls back to
+  `EMBEDDING_BASE_URL` when unset, so v0.1.x configs continue to work.
+
+### Migration: Kilo (LLM) + Voyage (embeddings) — recipe
+
+Defaults stay on Kilo/OpenAI for safe upgrades; switch to Voyage
+explicitly via:
+
+```yaml
+llm_provider: openai
+llm_model: minimax/minimax-m3
+llm_base_url: https://api.kilo.ai/api/gateway/v1
+
+embedding_provider: openai_compatible
+embedding_model: voyage-4-large
+embedding_dimensions: 1024
+embedding_endpoint: https://api.voyageai.com/v1
+embedding_api_key: <your-voyage-key>
+```
+
+Voyage API keys start with `pa-`. The `embedding_dimensions` must stay
+at `1024` for `voyage-4-large`; changing the dimension requires a clean
+rebuild of the LanceDB vector index (delete
+`/share/cognee/.data_storage/lancedb_data` before re-indexing).
+
+### Notes for existing installs
+
+- Schema gains one optional field (`embedding_endpoint`). HA UI surfaces
+  it automatically as an empty text input on the Configuration tab. Leave
+  blank if you are on the Kilo/OpenAI defaults — nothing breaks.
+- No `services.d/cognee/run` change (v0.1.6's re-source fix stays).
+- No `10-config` schema-change for existing fields — purely additive.
+
 ## [0.1.6] - 2026-08-12
 
 ### Fixed

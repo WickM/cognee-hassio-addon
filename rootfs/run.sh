@@ -44,7 +44,12 @@ fi
 export EMBEDDING_PROVIDER="${EMBEDDING_PROVIDER:-openai}"
 export EMBEDDING_MODEL="${EMBEDDING_MODEL:-text-embedding-3-small}"
 export EMBEDDING_DIMENSIONS="${EMBEDDING_DIMENSIONS:-1536}"
-if [ -n "${EMBEDDING_BASE_URL:-}" ]; then
+# v0.2.0: cognee 1.x reads `EMBEDDING_ENDPOINT` for `openai_compatible`.
+# Prefer the explicit endpoint if set, else fall back to `EMBEDDING_BASE_URL`
+# (kept for backwards-compat with v0.1.x configs and the `openai` provider).
+if [ -n "${EMBEDDING_ENDPOINT:-}" ]; then
+    :  # already exported by 10-config / s6 service-run
+elif [ -n "${EMBEDDING_BASE_URL:-}" ]; then
     export EMBEDDING_ENDPOINT="${EMBEDDING_BASE_URL}"
 fi
 

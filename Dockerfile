@@ -27,7 +27,16 @@ ARG TEMPIO_VERSION="2024.11.2"
 
 # Cognee pin — explicitly set; "latest" is BAD for reproducible deploys.
 # Bump intentionally, test add-on restart-survival before publishing.
-ARG COGNEE_VERSION="0.3.6"
+#
+# v0.2.0: bumped 0.3.6 → 1.4.2. 1.x adds `openai_compatible` as a first-class
+# embedding provider (0.3.x only had it via LiteLLM fallback + tiktoken gate
+# that crashed on non-OpenAI model names like `voyage-4-large`). 1.x also
+# replaces Kuzu with LadybugDB as the primary graph-database backend —
+# `ladybug` is pulled as a transitive cognee dep; do NOT `pip install kuzu`
+# on top or you'll mix incompatible backends. The provider name `kuzu`
+# remains accepted by cognee as a legacy alias (routed to the Ladybug
+# adapter internally).
+ARG COGNEE_VERSION="1.4.2"
 
 RUN \
     apt-get update && apt-get install -y --no-install-recommends \
