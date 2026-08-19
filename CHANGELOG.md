@@ -5,6 +5,63 @@ All notable changes to this add-on are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-08-19
+
+### Fixed — `cognify` crashes on Kilo + MiniMax-M3 BYOK routing
+
+Cognee's `GenericAPIAdapter` defaults to `instructor_mode: "json_mode"`
+for the `generic` provider, which sends `response_format: {type: "json_object"}`
+in every LLM call. Kilo's BYOK route to MiniMax-M3 strips OpenAI-specific
+features (`response_format`, `tools`) and returns HTTP 400
+`Invalid input param: response_format`. Symptom in cognee log:
+
+```
+Retrying GenericAPIAdapter.acreate_structured_output ...
+  litellm.APIConnectionError: MinimaxException - {"error":{"message":"Invalid input","type":"invalid_request_error","param":"response_format"}}
+```
+
+Switch to Instructor's `markdown_json_mode` (`MD_JSON`) which parses JSON
+out of Markdown code-blocks and never sends `response_format`. Verified
+working live with Instructor 1.15.1 + LiteLLM + Kilo + MiniMax-M3.
+
+- `config.yaml`: new schema option `llm_instructor_mode: str?`.
+- `config.yaml`: `options:` default is now `llm_instructor_mode: md_json`.
+- `rootfs/etc/cont-init.d/10-config`: read `llm_instructor_mode` from
+  HA options, export to env if non-empty.
+- `rootfs/run.sh`: export `LLM_INSTRUCTOR_MODE` for cognee if set.
+- Cognee reads it via `LLMConfig.llm_instructor_mode` (Pydantic-Settings,
+  auto-loads from `LLM_INSTRUCTOR_MODE` env var).
+
+### Fixed — Voyage 4-large rejects `output_dimension=0`
+
+HA-UI auto-fills `int?` schema fields with `0` if the user leaves them
+blank. cognee then sends `output_dimension=0` to Voyage, which returns
+HTTP 422 (`accepted values: [256, 512, 1024, 2048]`). Symptom: a long
+retry-loop followed by `Embedding connection test timed out after 30s`.
+
+- `config.yaml`: removed `embedding_dimensions` from the addon's
+  `options:` defaults block (was `1536`; was also forcing a non-default
+  dimension on providers like Voyage that pick their own).
+- `rootfs/etc/cont-init.d/10-config`: if `embedding_dimensions` is empty
+  OR `0`, treat as unset (don't export). Provider falls back to its
+  default (1024 for `voyage-4-large`).
+- `rootfs/run.sh`: defense-in-depth — same unset-when-zero logic.
+
+### Changed — sensible defaults for Kilo + MiniMax + Voyage
+
+The addon's `options:` defaults previously hard-coded OpenAI's
+`text-embedding-3-small` (1536 dim) and the `openai` provider, which
+crashes with every MiniMax / Voyage combination. Updated defaults now
+match a working Kilo + MiniMax-M3 + Voyage-4-large setup.
+
+- `config.yaml` `options:`:
+  - `llm_provider: custom` (was `openai`)
+  - `embedding_provider: voyageai` (was `openai`)
+  - `embedding_model: voyage/voyage-4-large` (was `text-embedding-3-small`)
+  - `embedding_endpoint: https://api.voyageai.com/v1` (new)
+  - `embedding_dimensions:` removed (was `1536`)
+  - `llm_instructor_mode: md_json` (new)
+
 ## [0.2.1] - 2026-08-14
 
 ### Fixed — cognee 1.x default auth + endpoint resolution

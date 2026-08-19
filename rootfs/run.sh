@@ -26,6 +26,7 @@ echo "[run.sh] DATA_ROOT_DIRECTORY=${DATA_ROOT_DIRECTORY:-<unset>}"
 echo "[run.sh] CACHE_ROOT_DIRECTORY=${CACHE_ROOT_DIRECTORY:-<unset>}"
 echo "[run.sh] COGNEE_PORT=${COGNEE_PORT:-8000} LLM_PROVIDER=${LLM_PROVIDER:-<unset>} LLM_MODEL=${LLM_MODEL:-<unset>}"
 echo "[run.sh] EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-<unset>} EMBEDDING_MODEL=${EMBEDDING_MODEL:-<unset>} DIM=${EMBEDDING_DIMENSIONS:-<unset>}"
+echo "[run.sh] LLM_INSTRUCTOR_MODE=${LLM_INSTRUCTOR_MODE:-<unset>}"
 echo "[run.sh] AGENT_MODE=${AGENT_MODE:-false} LOG_LEVEL=${LOG_LEVEL:-INFO}"
 
 # ---- Defensive defaults in case 10-config didn't run ----
@@ -53,7 +54,14 @@ fi
 
 export EMBEDDING_PROVIDER="${EMBEDDING_PROVIDER:-openai}"
 export EMBEDDING_MODEL="${EMBEDDING_MODEL:-text-embedding-3-small}"
-export EMBEDDING_DIMENSIONS="${EMBEDDING_DIMENSIONS:-1536}"
+# v0.2.3: don't default EMBEDDING_DIMENSIONS to anything — cognee/embedding
+# provider picks its own default (e.g. Voyage 4-large → 1024). Earlier
+# versions defaulted to 1536 which broke Voyage/OpenAI non-default models.
+if [ -n "${EMBEDDING_DIMENSIONS:-}" ]; then
+    export EMBEDDING_DIMENSIONS
+else
+    unset EMBEDDING_DIMENSIONS
+fi
 # v0.2.1: cognee 1.x reads `EMBEDDING_ENDPOINT` for `openai_compatible`.
 # Resolve *before* exporting so we can log the final value. Prefer the
 # explicit endpoint (set via v0.2.0+ schema field `embedding_endpoint`),
@@ -63,6 +71,15 @@ if [ -z "${EMBEDDING_ENDPOINT:-}" ] && [ -n "${EMBEDDING_BASE_URL:-}" ]; then
     export EMBEDDING_ENDPOINT="${EMBEDDING_BASE_URL}"
 fi
 export EMBEDDING_ENDPOINT
+
+# v0.2.3: instructor mode override. Empty means "cognee default".
+# Kilo's BYOK MiniMax routing rejects `response_format: json_object` so
+# `md_json` (Instructor's markdown_json_mode) is required for Kilo+M3.
+if [ -n "${LLM_INSTRUCTOR_MODE:-}" ]; then
+    export LLM_INSTRUCTOR_MODE
+else
+    unset LLM_INSTRUCTOR_MODE
+fi
 
 # v0.2.1: same for LLM. Kilo is exposed OpenAI-compatible but the `openai`
 # provider works against any /v1/chat/completions endpoint via LLM_BASE_URL.

@@ -96,11 +96,23 @@ LLM_PROVIDER="$(_bashio_config 'llm_provider' 'openai')"
 LLM_MODEL="$(_bashio_config 'llm_model' 'minimax/minimax-m3')"
 EMBEDDING_PROVIDER="$(_bashio_config 'embedding_provider' 'openai')"
 EMBEDDING_MODEL="$(_bashio_config 'embedding_model' 'text-embedding-3-small')"
-EMBEDDING_DIMENSIONS="$(_bashio_config 'embedding_dimensions' '1536')"
+EMBEDDING_DIMENSIONS="$(_bashio_config 'embedding_dimensions' '')"
+# v0.2.3: HA-UI auto-fills `int?` schema fields with `0` if blank. cognee
+# then passes `output_dimension=0` to Voyage 4-large, which rejects with
+# HTTP 422 ("accepted values: [256, 512, 1024, 2048]"). If the user left
+# the field empty (intentional) OR HA inserted 0 (the bug), treat it as
+# "unset" — don't export, let the provider pick its default (1024 for
+# voyage-4-large).
+if [ -z "${EMBEDDING_DIMENSIONS}" ] || [ "${EMBEDDING_DIMENSIONS}" = "0" ]; then
+    unset EMBEDDING_DIMENSIONS
+fi
 # v0.2.0: read new `embedding_endpoint` (cognee 1.x variable name) — used
 # when `embedding_provider=openai_compatible`. Falls back to `embedding_base_url`
 # in run.sh if unset, so v0.1.x configs keep working.
 EMBEDDING_ENDPOINT="$(_bashio_config 'embedding_endpoint' '')"
+# v0.2.3: instructor mode override. Empty string means "use cognee's
+# default" (typically `json_mode` for the `generic` adapter).
+LLM_INSTRUCTOR_MODE="$(_bashio_config 'llm_instructor_mode' '')"
 COGNEE_PORT="$(_bashio_config 'cognee_port' '8000')"
 AGENT_MODE="$(_bashio_config 'agent_mode' 'true')"
 LOG_LEVEL="$(_bashio_config 'log_level' 'INFO')"
@@ -151,11 +163,14 @@ export CACHE_ROOT_DIRECTORY="${DATA_PATH}/.cognee_cache"
 
 export DATA_PATH LLM_API_KEY EMBEDDING_API_KEY \
        LLM_PROVIDER LLM_MODEL \
-       EMBEDDING_PROVIDER EMBEDDING_MODEL EMBEDDING_DIMENSIONS \
-       EMBEDDING_ENDPOINT \
+       EMBEDDING_PROVIDER EMBEDDING_MODEL \
+       EMBEDDING_ENDPOINT LLM_INSTRUCTOR_MODE \
        ENABLE_BACKEND_ACCESS_CONTROL REQUIRE_AUTHENTICATION \
        COGNEE_PORT AGENT_MODE LOG_LEVEL \
        SYSTEM_ROOT_DIRECTORY DATA_ROOT_DIRECTORY CACHE_ROOT_DIRECTORY
+# v0.2.3: only export EMBEDDING_DIMENSIONS if non-empty/non-zero (see above).
+# This is intentionally a separate export so the conditional is local.
+[ -n "${EMBEDDING_DIMENSIONS:-}" ] && export EMBEDDING_DIMENSIONS
 
 # Optional base URLs (kept for backwards-compat with v0.1.x configs and
 # the `openai` provider; `openai_compatible` uses EMBEDDING_ENDPOINT above).
@@ -180,7 +195,8 @@ export LLM_ENDPOINT EMBEDDING_ENDPOINT
     echo "LLM_ENDPOINT=${LLM_ENDPOINT:-<fallback-via-run.sh}"
     echo "EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER}"
     echo "EMBEDDING_MODEL=${EMBEDDING_MODEL}"
-    echo "EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS}"
+    echo "EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS:-<unset>}"
+    echo "LLM_INSTRUCTOR_MODE=${LLM_INSTRUCTOR_MODE:-<unset>}"
     echo "EMBEDDING_ENDPOINT=${EMBEDDING_ENDPOINT:-<fallback-via-run.sh>}"
     echo "EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-<unset>}"
     echo "ENABLE_BACKEND_ACCESS_CONTROL=${ENABLE_BACKEND_ACCESS_CONTROL:-<set-in-run.sh>}"

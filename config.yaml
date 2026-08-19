@@ -1,5 +1,5 @@
 name: Cognee
-version: "0.2.1"
+version: "0.2.3"
 slug: cognee
 description: Cognee graph memory + retrieval API (sidecar to OpenClaw / any agent)
 url: https://github.com/WickM/cognee-hassio-addon
@@ -28,6 +28,10 @@ schema:
   # Embeddings
   embedding_provider: str
   embedding_model: str
+  # v0.2.3: no default. HA-UI auto-fills `int?` with 0 if left empty,
+  # which causes Voyage 4-large to reject `output_dimension=0` (HTTP 422).
+  # If users want a value, they set it explicitly; else leave the field
+  # blank in HA-UI (after the empty-save quirk is fixed upstream).
   embedding_dimensions: int?
   # v0.2.0: `embedding_endpoint` is the cognee-1.x variable name. Optional;
   # when `embedding_provider=openai_compatible`, this is REQUIRED (cognee
@@ -36,6 +40,14 @@ schema:
   # and with the `openai` provider (which does fall back to it).
   embedding_endpoint: str?
   embedding_base_url: str?
+
+  # v0.2.3: instructor mode override. Cognee defaults to `json_mode` for
+  # the `generic` adapter, which sends `response_format: {type: json_object}`
+  # to the LLM. Kilo's BYOK MiniMax routing strips that — HTTP 400
+  # `Invalid input param: response_format`. `md_json` parses JSON from
+  # Markdown code-blocks instead, with no `response_format` involved.
+  # Leave empty to use cognee's default.
+  llm_instructor_mode: str?
 
   # Addon behavior
   cognee_port: int
@@ -47,15 +59,20 @@ options:
   llm_api_key: ""
   embedding_api_key: ""
 
-  # Defaults: kilocode gateway with MiniMax + openai embeddings
-  llm_provider: openai
+  # v0.2.3 defaults: kilocode gateway + MiniMax-M3 (LLM) + Voyage-4-large (embeddings).
+  # `embedding_dimensions` is intentionally NOT in `options:` — HA-UI auto-fills
+  # `int?` fields with `0` if they're missing, which makes Voyage reject `dim=0`.
+  llm_provider: custom
   llm_model: minimax/minimax-m3
   llm_base_url: https://api.kilo.ai/api/gateway/v1
+  llm_instructor_mode: md_json
 
-  embedding_provider: openai
-  embedding_model: text-embedding-3-small
-  embedding_dimensions: 1536
-  embedding_base_url: https://api.kilo.ai/api/gateway/v1
+  embedding_provider: voyageai
+  embedding_model: voyage/voyage-4-large
+  embedding_endpoint: https://api.voyageai.com/v1
+  # No `embedding_dimensions:` key here. Add explicitly in HA-UI if you
+  # want a non-default value (Voyage 4-large accepts 256/512/1024/2048;
+  # default is 1024).
 
   cognee_port: 8000
   agent_mode: true
