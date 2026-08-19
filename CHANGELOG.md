@@ -322,3 +322,13 @@ v0.1.3 (commit `3ca3acf`) already contains the persistence fix
 If you already updated to v0.1.3 and the log shows
 `Database storage: /share/cognee/.cognee_system/databases`, you're done —
 v0.1.4 brings no new behavior.
+
+## [0.2.4] - 2026-08-19
+
+### Fixed
+- **`llm_instructor_mode` default corrected**: `md_json` → `MD_JSON`. Cognee calls `instructor.Mode(self.instructor_mode)` which is a Python `enum.Enum` and only accepts the **enum member name** (case-sensitive), not the string value. The string `"md_json"` is invalid; the correct value is `"MD_JSON"` (the enum-name maps to value `"markdown_json_mode"`).
+
+### Verified
+- Live-tested against Kilo + MiniMax-M3 (BYOK) with `MD_JSON` mode: returns valid JSON extracted from `\`\`\`json{...}\`\`\`` code block. No `response_format` header sent. ✅
+- TOOLS mode: M3 ignores tool_choice / makes multiple tool calls (Instructor can't parse). ❌
+- JSON mode: Kilo returns 400 `Invalid input param: response_format`. ❌

@@ -1,5 +1,5 @@
 name: Cognee
-version: "0.2.3"
+version: "0.2.4"
 slug: cognee
 description: Cognee graph memory + retrieval API (sidecar to OpenClaw / any agent)
 url: https://github.com/WickM/cognee-hassio-addon
@@ -65,7 +65,7 @@ options:
   llm_provider: custom
   llm_model: minimax/minimax-m3
   llm_base_url: https://api.kilo.ai/api/gateway/v1
-  llm_instructor_mode: md_json
+  llm_instructor_mode: MD_JSON
 
   embedding_provider: voyageai
   embedding_model: voyage/voyage-4-large
