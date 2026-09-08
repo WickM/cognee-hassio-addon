@@ -34,6 +34,7 @@ echo "[run.sh] AGENT_MODE=${AGENT_MODE:-false} LOG_LEVEL=${LOG_LEVEL:-INFO}"
 : "${COGNEE_PORT:=8000}"
 : "${AGENT_MODE:=true}"
 : "${LOG_LEVEL:=INFO}"
+: "${ENABLE_MCP:=true}"
 
 mkdir -p "${DATA_PATH}/.cognee" "${DATA_PATH}/logs"
 
@@ -110,14 +111,32 @@ mkdir -p "${SYSTEM_ROOT_DIRECTORY}" "${DATA_ROOT_DIRECTORY}" "${CACHE_ROOT_DIREC
 PY="$(command -v python || command -v python3)"
 echo "[run.sh] effective endpoints: LLM_ENDPOINT=${LLM_ENDPOINT:-<unset>} EMBEDDING_ENDPOINT=${EMBEDDING_ENDPOINT:-<unset>}"
 echo "[run.sh] auth bypass: ENABLE_BACKEND_ACCESS_CONTROL=${ENABLE_BACKEND_ACCESS_CONTROL} REQUIRE_AUTHENTICATION=${REQUIRE_AUTHENTICATION}"
+echo "[run.sh] mcp: ENABLE_MCP=${ENABLE_MCP}"
 echo "[run.sh] starting cognee API on 0.0.0.0:${COGNEE_PORT}"
 echo "[run.sh] agent_mode=${AGENT_MODE} (auto-shutdown when no agent is active)"
 
 # Cognee exposes a FastAPI app under cognee.api. Use uvicorn directly.
 # AGENT_MODE=true tells cognee to idle-sleep when no client is connected,
 # which is the addon-friendly behavior for a sidecar memory service.
-exec "${PY}" -m uvicorn cognee.api.client:app \
-    --host 0.0.0.0 \
-    --port "${COGNEE_PORT}" \
-    --log-level "$(echo "${LOG_LEVEL}" | tr '[:upper:]' '[:lower:]')" \
-    --no-access-log
+#
+# v0.3.0: when ENABLE_MCP=true (default), launch the combined ASGI app
+# that mounts cognee's FastAPI + MCP Streamable HTTP + SSE on a single
+# port. The MCP adapter lives at /usr/sbin/cognee_combined_app.py and
+# dispatches based on path (/mcp, /sse, /messages/* → MCP; everything
+# else → cognee). When disabled, fall back to cognee-only as before.
+if [ "${ENABLE_MCP}" = "true" ]; then
+    echo "[run.sh] MCP enabled — launching combined app (cognee + MCP on /mcp, /sse)"
+    exec "${PY}" -m uvicorn cognee_combined_app:app \
+        --app-dir /usr/sbin \
+        --host 0.0.0.0 \
+        --port "${COGNEE_PORT}" \
+        --log-level "$(echo "${LOG_LEVEL}" | tr '[:upper:]' '[:lower:]')" \
+        --no-access-log
+else
+    echo "[run.sh] MCP disabled — launching cognee API only"
+    exec "${PY}" -m uvicorn cognee.api.client:app \
+        --host 0.0.0.0 \
+        --port "${COGNEE_PORT}" \
+        --log-level "$(echo "${LOG_LEVEL}" | tr '[:upper:]' '[:lower:]')" \
+        --no-access-log
+fi

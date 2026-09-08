@@ -116,6 +116,9 @@ LLM_INSTRUCTOR_MODE="$(_bashio_config 'llm_instructor_mode' '')"
 COGNEE_PORT="$(_bashio_config 'cognee_port' '8000')"
 AGENT_MODE="$(_bashio_config 'agent_mode' 'true')"
 LOG_LEVEL="$(_bashio_config 'log_level' 'INFO')"
+# v0.3.0: MCP server toggle. When true, run.sh launches the combined
+# ASGI app (cognee + MCP on /mcp, /sse). When false, cognee-only.
+ENABLE_MCP="$(_bashio_config 'enable_mcp' 'true')"
 
 # ---- Validations (fatal) ----
 if [ -z "${LLM_API_KEY}" ]; then
@@ -166,7 +169,7 @@ export DATA_PATH LLM_API_KEY EMBEDDING_API_KEY \
        EMBEDDING_PROVIDER EMBEDDING_MODEL \
        EMBEDDING_ENDPOINT LLM_INSTRUCTOR_MODE \
        ENABLE_BACKEND_ACCESS_CONTROL REQUIRE_AUTHENTICATION \
-       COGNEE_PORT AGENT_MODE LOG_LEVEL \
+       COGNEE_PORT AGENT_MODE LOG_LEVEL ENABLE_MCP \
        SYSTEM_ROOT_DIRECTORY DATA_ROOT_DIRECTORY CACHE_ROOT_DIRECTORY
 # v0.2.3: only export EMBEDDING_DIMENSIONS if non-empty/non-zero (see above).
 # This is intentionally a separate export so the conditional is local.
@@ -204,6 +207,7 @@ export LLM_ENDPOINT EMBEDDING_ENDPOINT
     echo "COGNEE_PORT=${COGNEE_PORT}"
     echo "AGENT_MODE=${AGENT_MODE}"
     echo "LOG_LEVEL=${LOG_LEVEL}"
+    echo "ENABLE_MCP=${ENABLE_MCP}"
     echo "LLM_API_KEY_LEN=${#LLM_API_KEY}"
     echo "EMBEDDING_API_KEY_LEN=${#EMBEDDING_API_KEY}"
 } > "${DATA_PATH}/logs/options.env"

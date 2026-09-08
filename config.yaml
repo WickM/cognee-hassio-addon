@@ -1,5 +1,5 @@
 name: Cognee
-version: "0.2.4"
+version: "0.3.0"
 slug: cognee
 description: Cognee graph memory + retrieval API (sidecar to OpenClaw / any agent)
 url: https://github.com/WickM/cognee-hassio-addon
@@ -54,6 +54,11 @@ schema:
   agent_mode: bool
   log_level: str
   data_path: str
+  # v0.3.0: MCP server — when enabled, the addon mounts a Model Context
+  # Protocol server alongside cognee's REST API on the same port.
+  # Streamable HTTP at /mcp, SSE at /sse + /messages/. Compatible with
+  # OpenClaw, Cline, Kilo, and any MCP-capable agent.
+  enable_mcp: bool
 
 options:
   llm_api_key: ""
@@ -78,10 +83,11 @@ options:
   agent_mode: true
   log_level: INFO
   data_path: /share/cognee
+  enable_mcp: true
 
 ports:
   8000/tcp: 8000
 ports_description:
-  8000/tcp: Cognee API + Web UI
+  8000/tcp: Cognee API + Web UI + MCP endpoints (/mcp, /sse)
 
 image: ghcr.io/wickm/cognee-hassio-addon

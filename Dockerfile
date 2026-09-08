@@ -87,10 +87,15 @@ RUN \
     && apt-get purge -y --auto-remove \
     && rm -rf /var/lib/apt/lists/* /tmp/*
 
-# Install cognee (pinned) + uvicorn for the API server
+# Install cognee (pinned) + uvicorn for the API server + MCP SDK
+# v0.3.0: mcp + httpx enable the MCP server adapter that runs alongside
+# cognee's FastAPI app. mcp provides FastMCP (Streamable HTTP + SSE);
+# httpx is used by the adapter to call cognee's REST API internally.
 RUN pip install --no-cache-dir \
         "cognee==${COGNEE_VERSION}" \
-        "uvicorn[standard]>=0.30"
+        "uvicorn[standard]>=0.30" \
+        "mcp>=2.0" \
+        "httpx>=0.27"
 
 COPY rootfs /
 

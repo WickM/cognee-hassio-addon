@@ -5,6 +5,67 @@ All notable changes to this add-on are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-09-08
+
+### Added — MCP (Model Context Protocol) server
+
+The addon now exposes a native MCP server alongside cognee's REST API on the
+same port (8000). This allows MCP-capable agents — OpenClaw, Cline, Kilo —
+to use cognee as a graph memory tool without a separate plugin or REST
+client.
+
+**Transports** (both on port 8000):
+- `Streamable HTTP` at `/mcp` (modern MCP spec, single endpoint)
+- `SSE` at `/sse` + `/messages/` (legacy HTTP, broader compatibility)
+
+**MCP tools exposed:**
+
+| Tool | Cognee API | Purpose |
+|------|-----------|--------|
+| `cognee_search` | `POST /api/v1/search` | Semantic graph search |
+| `cognee_add_text` | `POST /api/v1/add` | Ingest text into a dataset |
+| `cognee_cognify` | `POST /api/v1/cognify` | Process data into knowledge graph |
+| `cognee_recall` | `POST /api/v1/recall` | Memory-oriented recall |
+| `cognee_list_datasets` | `GET /api/v1/datasets` | List datasets |
+| `cognee_create_dataset` | `POST /api/v1/datasets` | Create a dataset |
+| `cognee_get_dataset_data` | `GET /api/v1/datasets/{id}/data` | Get raw data |
+| `cognee_get_graph` | `GET /api/v1/datasets/{id}/graph` | Get graph structure |
+
+**Architecture:** A single ASGI dispatcher (`cognee_combined_app.py`) routes
+requests by path: `/mcp` → MCP Streamable HTTP, `/sse` + `/messages/*` → MCP
+SSE, everything else → cognee's unmodified FastAPI app. The MCP adapter
+(`cognee_mcp_server.py`) calls cognee's REST API internally via `httpx`.
+
+**Agent configuration:**
+
+OpenClaw:
+```bash
+openclaw mcp add cognee --url http://cognee:8000/mcp --transport streamable-http
+```
+
+Cline (`cline_mcp_settings.json`):
+```json
+{
+  "mcpServers": {
+    "cognee": {
+      "url": "http://cognee:8000/mcp",
+      "transport": "streamable-http"
+    }
+  }
+}
+```
+
+Kilo: analogous, same URL.
+
+**Configuration:**
+- `config.yaml`: new schema option `enable_mcp: bool` (default `true`).
+  When disabled, the addon launches cognee-only as before (v0.2.x behavior).
+- `Dockerfile`: added `mcp>=2.0` and `httpx>=0.27` to the pip install.
+- `rootfs/usr/sbin/cognee_mcp_server.py`: MCP adapter with 8 tools (new).
+- `rootfs/usr/sbin/cognee_combined_app.py`: ASGI dispatcher (new).
+- `rootfs/run.sh`: conditional combined-app launch when `ENABLE_MCP=true`.
+- `rootfs/etc/cont-init.d/10-config`: reads and exports `ENABLE_MCP`.
+
 ## [0.2.3] - 2026-08-19
 
 ### Fixed — `cognify` crashes on Kilo + MiniMax-M3 BYOK routing
