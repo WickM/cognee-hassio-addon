@@ -5,6 +5,19 @@ All notable changes to this add-on are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-09-09
+
+### Fixed — single-port ASGI middleware (force HA update)
+
+Version bump from 0.3.1 → 0.3.2. The previous 0.3.1 tag was force-pushed
+with the same version string, which HA ignores (it compares the config.yaml
+version string, not the git tag). This release has the correct image.
+
+No code changes vs. 0.3.1 final:
+- Single-port ASGI middleware on port 8000
+- MCP SSE at `/sse` + `/messages/`
+- Cognee REST API unchanged
+
 ## [0.3.1] - 2026-09-09
 
 ### Fixed — MCP integration (single-port ASGI middleware)
