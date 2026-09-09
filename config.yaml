@@ -54,10 +54,10 @@ schema:
   agent_mode: bool
   log_level: str
   data_path: str
-  # v0.3.0: MCP server — when enabled, the addon mounts a Model Context
-  # Protocol server alongside cognee's REST API on the same port.
-  # Streamable HTTP at /mcp, SSE at /sse + /messages/. Compatible with
-  # OpenClaw, Cline, Kilo, and any MCP-capable agent.
+  # v0.3.1: MCP server — when enabled, the addon starts a Model Context
+  # Protocol SSE server on port 8001 alongside cognee's REST API on port
+  # 8000. SSE at /sse + /messages/. Compatible with OpenClaw, Cline,
+  # Kilo, and any MCP-capable agent.
   enable_mcp: bool
 
 options:
@@ -87,7 +87,9 @@ options:
 
 ports:
   8000/tcp: 8000
+  8001/tcp: 8001
 ports_description:
-  8000/tcp: Cognee API + Web UI + MCP endpoints (/mcp, /sse)
+  8000/tcp: Cognee REST API + Web UI
+  8001/tcp: MCP SSE server (/sse, /messages/)
 
 image: ghcr.io/wickm/cognee-hassio-addon

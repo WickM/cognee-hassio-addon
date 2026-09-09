@@ -115,28 +115,10 @@ echo "[run.sh] mcp: ENABLE_MCP=${ENABLE_MCP}"
 echo "[run.sh] starting cognee API on 0.0.0.0:${COGNEE_PORT}"
 echo "[run.sh] agent_mode=${AGENT_MODE} (auto-shutdown when no agent is active)"
 
-# Cognee exposes a FastAPI app under cognee.api. Use uvicorn directly.
-# AGENT_MODE=true tells cognee to idle-sleep when no client is connected,
-# which is the addon-friendly behavior for a sidecar memory service.
+# v0.3.1: use the combined launcher script. When ENABLE_MCP=true (default),
+# it starts cognee on port 8000 AND MCP SSE on port 8001 in the same
+# asyncio event loop. When disabled, cognee-only on port 8000 (v0.2.x compat).
 #
-# v0.3.0: when ENABLE_MCP=true (default), launch the combined ASGI app
-# that mounts cognee's FastAPI + MCP Streamable HTTP + SSE on a single
-# port. The MCP adapter lives at /usr/sbin/cognee_combined_app.py and
-# dispatches based on path (/mcp, /sse, /messages/* → MCP; everything
-# else → cognee). When disabled, fall back to cognee-only as before.
-if [ "${ENABLE_MCP}" = "true" ]; then
-    echo "[run.sh] MCP enabled — launching combined app (cognee + MCP on /mcp, /sse)"
-    exec "${PY}" -m uvicorn cognee_combined_app:app \
-        --app-dir /usr/sbin \
-        --host 0.0.0.0 \
-        --port "${COGNEE_PORT}" \
-        --log-level "$(echo "${LOG_LEVEL}" | tr '[:upper:]' '[:lower:]')" \
-        --no-access-log
-else
-    echo "[run.sh] MCP disabled — launching cognee API only"
-    exec "${PY}" -m uvicorn cognee.api.client:app \
-        --host 0.0.0.0 \
-        --port "${COGNEE_PORT}" \
-        --log-level "$(echo "${LOG_LEVEL}" | tr '[:upper:]' '[:lower:]')" \
-        --no-access-log
-fi
+# The combined launcher handles auth-bypass env vars internally.
+# See /usr/sbin/cognee_combined_app.py for the full architecture.
+exec "${PY}" /usr/sbin/cognee_combined_app.py

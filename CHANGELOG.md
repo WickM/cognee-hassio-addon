@@ -7,16 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.1] - 2026-09-09
 
+### Fixed — MCP SDK version pin + architecture rewrite
+
+**Problem (v0.3.0):** The MCP server returned 500 Internal Server Error on
+all requests. Root cause: the ASGI dispatcher approach used `mcp.sse_app()`
+and `mcp.streamable_http_app()` directly, but the StreamableHTTP transport
+requires a session-manager initialized via ASGI lifespan — which a raw
+dispatcher doesn't forward.
+
+**Fix:** Rewrote the MCP integration to use a separate port (8001) with the
+SSE transport only. The SSE transport creates a fresh session per connection
+and doesn't need lifespan initialization, making it the simplest reliable
+path.
+
+**Architecture:**
+```
+Port 8000 — cognee REST API (unmodified, single uvicorn)
+Port 8001 — MCP SSE server (/sse + /messages/) (separate uvicorn, same
+           asyncio event loop)
+```
+
+Both uvicorn instances run in the same event loop via `asyncio.gather()`.
+When `ENABLE_MCP=false`, only port 8000 starts (v0.2.x compat).
+
+**Agent configuration:**
+
+OpenClaw:
+```bash
+openclaw mcp add cognee --url http://cognee:8001/sse --transport sse
+```
+
+Cline:
+```json
+{
+  "mcpServers": {
+    "cognee": {
+      "url": "http://cognee:8001/sse",
+      "transport": "sse"
+    }
+  }
+}
+```
+
 ### Fixed — MCP SDK version pin
 
 `mcp>=2.0` pulled in MCP SDK 2.x, which renamed `FastMCP` to `MCPServer`
-and changed the import path from `mcp.server.fastmcp` to
-`mcp.server.mcpserver`. The adapter code uses the 1.x `FastMCP` API.
+and changed the import path. Pinned to `mcp>=1.0,<2` (latest 1.x = 1.30.0).
 
-- `Dockerfile`: pin `mcp>=1.0,<2` (latest 1.x is 1.30.0).
-- No other changes — the adapter code is correct for 1.x.
+### Changed files
 
-## [0.3.0] - 2026-09-08
+- `rootfs/usr/sbin/cognee_combined_app.py` — rewritten: asyncio launcher
+  (two uvicorn instances) instead of ASGI dispatcher.
+- `rootfs/run.sh` — simplified: just exec the combined launcher script.
+- `config.yaml` — added port 8001/tcp, updated descriptions.
+- `Dockerfile` — pin `mcp>=1.0,<2`.
 
 ### Added — MCP (Model Context Protocol) server
 
@@ -25,9 +69,7 @@ same port (8000). This allows MCP-capable agents — OpenClaw, Cline, Kilo —
 to use cognee as a graph memory tool without a separate plugin or REST
 client.
 
-**Transports** (both on port 8000):
-- `Streamable HTTP` at `/mcp` (modern MCP spec, single endpoint)
-- `SSE` at `/sse` + `/messages/` (legacy HTTP, broader compatibility)
+**Transports:** SSE on port 8001 (`/sse` + `/messages/`)
 
 **MCP tools exposed:**
 
@@ -42,16 +84,17 @@ client.
 | `cognee_get_dataset_data` | `GET /api/v1/datasets/{id}/data` | Get raw data |
 | `cognee_get_graph` | `GET /api/v1/datasets/{id}/graph` | Get graph structure |
 
-**Architecture:** A single ASGI dispatcher (`cognee_combined_app.py`) routes
-requests by path: `/mcp` → MCP Streamable HTTP, `/sse` + `/messages/*` → MCP
-SSE, everything else → cognee's unmodified FastAPI app. The MCP adapter
-(`cognee_mcp_server.py`) calls cognee's REST API internally via `httpx`.
+**Architecture:** A combined asyncio launcher starts two uvicorn instances
+in the same event loop: cognee on port 8000, MCP SSE on port 8001. The MCP
+adapter (`cognee_mcp_server.py`) calls cognee's REST API internally via
+`httpx`. The SSE transport creates a fresh session per connection and
+doesn't require ASGI lifespan initialization.
 
 **Agent configuration:**
 
 OpenClaw:
 ```bash
-openclaw mcp add cognee --url http://cognee:8000/mcp --transport streamable-http
+openclaw mcp add cognee --url http://cognee:8001/sse --transport sse
 ```
 
 Cline (`cline_mcp_settings.json`):
@@ -59,8 +102,8 @@ Cline (`cline_mcp_settings.json`):
 {
   "mcpServers": {
     "cognee": {
-      "url": "http://cognee:8000/mcp",
-      "transport": "streamable-http"
+      "url": "http://cognee:8001/sse",
+      "transport": "sse"
     }
   }
 }
@@ -70,11 +113,11 @@ Kilo: analogous, same URL.
 
 **Configuration:**
 - `config.yaml`: new schema option `enable_mcp: bool` (default `true`).
-  When disabled, the addon launches cognee-only as before (v0.2.x behavior).
-- `Dockerfile`: added `mcp>=2.0` and `httpx>=0.27` to the pip install.
+  New port `8001/tcp` for MCP.
+- `Dockerfile`: added `mcp` and `httpx` to pip install.
 - `rootfs/usr/sbin/cognee_mcp_server.py`: MCP adapter with 8 tools (new).
-- `rootfs/usr/sbin/cognee_combined_app.py`: ASGI dispatcher (new).
-- `rootfs/run.sh`: conditional combined-app launch when `ENABLE_MCP=true`.
+- `rootfs/usr/sbin/cognee_combined_app.py`: asyncio launcher (new).
+- `rootfs/run.sh`: exec the combined launcher script.
 - `rootfs/etc/cont-init.d/10-config`: reads and exports `ENABLE_MCP`.
 
 ## [0.2.3] - 2026-08-19
