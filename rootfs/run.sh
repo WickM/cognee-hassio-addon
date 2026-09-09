@@ -112,13 +112,18 @@ PY="$(command -v python || command -v python3)"
 echo "[run.sh] effective endpoints: LLM_ENDPOINT=${LLM_ENDPOINT:-<unset>} EMBEDDING_ENDPOINT=${EMBEDDING_ENDPOINT:-<unset>}"
 echo "[run.sh] auth bypass: ENABLE_BACKEND_ACCESS_CONTROL=${ENABLE_BACKEND_ACCESS_CONTROL} REQUIRE_AUTHENTICATION=${REQUIRE_AUTHENTICATION}"
 echo "[run.sh] mcp: ENABLE_MCP=${ENABLE_MCP}"
-echo "[run.sh] starting cognee API on 0.0.0.0:${COGNEE_PORT}"
+echo "[run.sh] starting on 0.0.0.0:${COGNEE_PORT}"
 echo "[run.sh] agent_mode=${AGENT_MODE} (auto-shutdown when no agent is active)"
 
-# v0.3.1: use the combined launcher script. When ENABLE_MCP=true (default),
-# it starts cognee on port 8000 AND MCP SSE on port 8001 in the same
-# asyncio event loop. When disabled, cognee-only on port 8000 (v0.2.x compat).
+# v0.3.1: use the combined ASGI app (cognee + MCP SSE on same port).
+# The combined app at /usr/sbin/cognee_combined_app.py exposes an `app`
+# ASGI callable that dispatches /sse and /messages/ to MCP, everything
+# else to cognee. When ENABLE_MCP=false, only cognee starts.
 #
-# The combined launcher handles auth-bypass env vars internally.
 # See /usr/sbin/cognee_combined_app.py for the full architecture.
-exec "${PY}" /usr/sbin/cognee_combined_app.py
+exec "${PY}" -m uvicorn cognee_combined_app:app \
+    --app-dir /usr/sbin \
+    --host 0.0.0.0 \
+    --port "${COGNEE_PORT}" \
+    --log-level "$(echo "${LOG_LEVEL}" | tr '[:upper:]' '[:lower:]')" \
+    --no-access-log

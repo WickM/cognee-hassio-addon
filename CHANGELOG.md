@@ -7,34 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.1] - 2026-09-09
 
-### Fixed — MCP SDK version pin + architecture rewrite
+### Fixed — MCP integration (single-port ASGI middleware)
 
 **Problem (v0.3.0):** The MCP server returned 500 Internal Server Error on
-all requests. Root cause: the ASGI dispatcher approach used `mcp.sse_app()`
-and `mcp.streamable_http_app()` directly, but the StreamableHTTP transport
-requires a session-manager initialized via ASGI lifespan — which a raw
-dispatcher doesn't forward.
+all requests. Root cause: the ASGI dispatcher used `mcp.streamable_http_app()`
+which requires a session-manager initialized via ASGI lifespan — a raw
+dispatcher doesn't forward lifespan events, so the session manager never
+started.
 
-**Fix:** Rewrote the MCP integration to use a separate port (8001) with the
-SSE transport only. The SSE transport creates a fresh session per connection
-and doesn't need lifespan initialization, making it the simplest reliable
-path.
+**Fix:** Rewrote the combined app as an ASGI middleware that intercepts
+only `/sse` and `/messages/` paths and routes them to the MCP SSE app.
+Everything else goes to cognee's unmodified FastAPI app. Both on port
+8000, single uvicorn.
+
+Only SSE transport is used (not StreamableHTTP). SSE creates a fresh
+session per connection and does NOT need lifespan initialization — making
+it the simplest reliable integration path.
 
 **Architecture:**
 ```
-Port 8000 — cognee REST API (unmodified, single uvicorn)
-Port 8001 — MCP SSE server (/sse + /messages/) (separate uvicorn, same
-           asyncio event loop)
+Port 8000 — single uvicorn
+  /sse, /messages/* → MCP SSE (ASGI middleware intercept)
+  /api/v1/*, /health, /docs → cognee FastAPI (passthrough)
 ```
-
-Both uvicorn instances run in the same event loop via `asyncio.gather()`.
-When `ENABLE_MCP=false`, only port 8000 starts (v0.2.x compat).
 
 **Agent configuration:**
 
 OpenClaw:
 ```bash
-openclaw mcp add cognee --url http://cognee:8001/sse --transport sse
+openclaw mcp add cognee --url http://cognee:8000/sse --transport sse
 ```
 
 Cline:
@@ -42,7 +43,7 @@ Cline:
 {
   "mcpServers": {
     "cognee": {
-      "url": "http://cognee:8001/sse",
+      "url": "http://cognee:8000/sse",
       "transport": "sse"
     }
   }
@@ -84,17 +85,17 @@ client.
 | `cognee_get_dataset_data` | `GET /api/v1/datasets/{id}/data` | Get raw data |
 | `cognee_get_graph` | `GET /api/v1/datasets/{id}/graph` | Get graph structure |
 
-**Architecture:** A combined asyncio launcher starts two uvicorn instances
-in the same event loop: cognee on port 8000, MCP SSE on port 8001. The MCP
-adapter (`cognee_mcp_server.py`) calls cognee's REST API internally via
-`httpx`. The SSE transport creates a fresh session per connection and
-doesn't require ASGI lifespan initialization.
+**Architecture:** The combined ASGI app (`cognee_combined_app.py`) uses an
+ASGI middleware to intercept `/sse` and `/messages/` paths and route them to
+the MCP SSE app. Everything else goes to cognee's FastAPI. Both on port
+8000, single uvicorn. The MCP adapter (`cognee_mcp_server.py`) calls
+cognee's REST API internally via `httpx`.
 
 **Agent configuration:**
 
 OpenClaw:
 ```bash
-openclaw mcp add cognee --url http://cognee:8001/sse --transport sse
+openclaw mcp add cognee --url http://cognee:8000/sse --transport sse
 ```
 
 Cline (`cline_mcp_settings.json`):
@@ -102,7 +103,7 @@ Cline (`cline_mcp_settings.json`):
 {
   "mcpServers": {
     "cognee": {
-      "url": "http://cognee:8001/sse",
+      "url": "http://cognee:8000/sse",
       "transport": "sse"
     }
   }
@@ -113,11 +114,10 @@ Kilo: analogous, same URL.
 
 **Configuration:**
 - `config.yaml`: new schema option `enable_mcp: bool` (default `true`).
-  New port `8001/tcp` for MCP.
 - `Dockerfile`: added `mcp` and `httpx` to pip install.
 - `rootfs/usr/sbin/cognee_mcp_server.py`: MCP adapter with 8 tools (new).
-- `rootfs/usr/sbin/cognee_combined_app.py`: asyncio launcher (new).
-- `rootfs/run.sh`: exec the combined launcher script.
+- `rootfs/usr/sbin/cognee_combined_app.py`: ASGI middleware (new).
+- `rootfs/run.sh`: uvicorn with combined app.
 - `rootfs/etc/cont-init.d/10-config`: reads and exports `ENABLE_MCP`.
 
 ## [0.2.3] - 2026-08-19
