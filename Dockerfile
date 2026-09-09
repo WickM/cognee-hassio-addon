@@ -91,10 +91,12 @@ RUN \
 # v0.3.0: mcp + httpx enable the MCP server adapter that runs alongside
 # cognee's FastAPI app. mcp provides FastMCP (Streamable HTTP + SSE);
 # httpx is used by the adapter to call cognee's REST API internally.
+# v0.3.1: pin mcp<2 — 2.x renamed FastMCP→MCPServer and changed the API.
+# Our adapter uses the 1.x FastMCP API. Pin to 1.30.0 (latest 1.x).
 RUN pip install --no-cache-dir \
         "cognee==${COGNEE_VERSION}" \
         "uvicorn[standard]>=0.30" \
-        "mcp>=2.0" \
+        "mcp>=1.0,<2" \
         "httpx>=0.27"
 
 COPY rootfs /
