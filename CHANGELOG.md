@@ -5,6 +5,49 @@ All notable changes to this add-on are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-10-01
+
+### Changed — Cognee 1.4.2 → 1.6.1
+
+Version bump of the pinned upstream `cognee` package. Config and REST
+surface consumed by this add-on and by `@cognee/cognee-openclaw` are unchanged.
+
+**Why 1.6.1 and not 1.6.2:** 1.6.2 shipped 2026-09-29, two days before this
+pin. 1.6.1 carries the full 1.5 → 1.6 jump and had a week of field reports;
+1.6.2 was 14 PRs old at pin time. The 1.4.2 → 1.6.x jump is the risky part,
+not the `.1` vs `.2` patch, so take the version with more soak time.
+
+**Verification method** — the 1.6.1 wheel was downloaded and inspected rather
+than inferred from release notes. `ImprovePayloadDTO`
+(`cognee/api/v1/improve/routers/get_improve_router.py`) keeps every field this
+add-on and the OpenClaw plugin send:
+
+- unchanged: `dataset_name`, `dataset_id`, `session_ids`, `node_name`,
+  `build_global_context_index`, `run_in_background`, `feedback_alpha`
+- added (additive, no breakage): `build_truth_subspace`, `extraction_tasks`,
+  `enrichment_tasks`
+
+`POST /api/v1/remember` (multipart: `datasetName`, `file`, `session_id`) and
+`GET /health` are likewise unchanged.
+
+**Dependency deltas across 1.5.x / 1.6.x** (all transitive, none pinned here):
+
+- `litellm` capped `<1.97`
+- `pydantic-settings` floor raised to `2.7.0`
+- `instructor` capped `<1.15.3`
+- `lancedb >=0.24.3`
+- `fastapi >=0.116.2`
+- Python floor unchanged: `<3.15, >=3.10`
+- LadybugDB 0.19.0 remains the graph backend; do **not** add `kuzu` on top
+
+### Notes
+
+- No add-on code changed — this release is the dependency pin only.
+- Persisted data at `data_path` (`/share/cognee`) is untouched; HA handles the
+  volume across add-on updates (`backup: hot`).
+- The add-on install/update itself stays a manual HA step; this tag only
+  publishes the image to GHCR.
+
 ## [0.3.2] - 2026-09-09
 
 ### Fixed — single-port ASGI middleware (force HA update)

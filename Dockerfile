@@ -36,7 +36,21 @@ ARG TEMPIO_VERSION="2024.11.2"
 # on top or you'll mix incompatible backends. The provider name `kuzu`
 # remains accepted by cognee as a legacy alias (routed to the Ladybug
 # adapter internally).
-ARG COGNEE_VERSION="1.4.2"
+#
+# v0.3.3: bumped 1.4.2 → 1.6.1. Deliberately NOT 1.6.2 (released 2026-09-29,
+# two days before this pin): 1.6.1 carries the full 1.5→1.6 jump and has been
+# out for a week, whereas 1.6.2 was 14 PRs old. The 1.4.2→1.6.x jump is the
+# risky part, not .1 vs .2 — take the version with seven days of field reports.
+# Verified against the 1.6.1 wheel: the REST surface this add-on and the
+# cognee-openclaw plugin depend on is unchanged —
+# `POST /api/v1/improve` still accepts `dataset_name`, `session_ids`,
+# `build_global_context_index`, `run_in_background` and `feedback_alpha`; the
+# `ImprovePayloadDTO` in 1.6.x only ADDED fields (build_truth_subspace,
+# extraction/enrichment_tasks). LadybugDB 0.19.0 is still the pinned backend.
+# Dependency deltas across 1.5.x/1.6.x: litellm capped <1.97, pydantic-settings
+# floor 2.7.0, instructor <1.15.3, lancedb >=0.24.3, fastapi >=0.116.2 — all
+# transitive, none pinned here. Python floor unchanged (<3.15,>=3.10).
+ARG COGNEE_VERSION="1.6.1"
 
 RUN \
     apt-get update && apt-get install -y --no-install-recommends \
