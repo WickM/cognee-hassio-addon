@@ -5,6 +5,26 @@ All notable changes to this add-on are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2026-11-17
+
+### Changed — Cognee 1.6.1 → 1.6.6
+
+Version bump of the pinned upstream `cognee` package. Patch-level jump within
+1.6.x — the risky 1.4.2→1.6.x jump is already behind us. 1.6.6 is
+docs.cognee.ai's current reference version.
+
+The REST surface consumed by this add-on and `@cognee/cognee-openclaw` is
+unchanged vs. 1.6.1 — `ImprovePayloadDTO` only added additive fields
+(`build_truth_subspace`, `extraction_tasks`, `enrichment_tasks`). LadybugDB
+0.19.0 remains the pinned graph backend; do **not** add `kuzu` on top.
+
+**Verification** — add-on restart-survival confirmed 2026-11-17 after the
+add-on was restarted to clear stuck pipeline locks (`cognify_pipeline`,
+`add_pipeline`, `memify_pipeline` stuck in `DATASET_PROCESSING_STARTED` on
+`openclaw-main`, every `improve` returning `lock_held`). After restart all
+pipelines reached `DATASET_PROCESSING_COMPLETED` / `outcome=succeeded` and
+`improve` stages execute normally.
+
 ## [0.3.3] - 2026-10-01
 
 ### Changed — Cognee 1.4.2 → 1.6.1
