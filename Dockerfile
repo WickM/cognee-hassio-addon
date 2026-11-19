@@ -119,6 +119,18 @@ RUN pip install --no-cache-dir \
         "mcp>=1.0,<2" \
         "httpx>=0.27"
 
+# v0.4.0: GLiNER2 dependencies for LLM-free graph extraction.
+# cognee[gliner] pulls gliner2[local]<3,>=2.0.0 + protobuf>=5.29.6 +
+# sentencepiece>=0.2.0 + torch<3,>=2.1. Install directly (not via the
+# cognee extra) to avoid fastembed 0.8.0 being pulled in — that version
+# is quarantined on corporate Nexus mirrors and would fail the build.
+# torch is pinned to CPU wheel via the default PyPI index.
+RUN pip install --no-cache-dir \
+        "gliner2[local]<3,>=2.0.0" \
+        "protobuf>=5.29.6" \
+        "sentencepiece>=0.2.0" \
+        "torch<3,>=2.1"
+
 COPY rootfs /
 
 ENTRYPOINT ["/init"]

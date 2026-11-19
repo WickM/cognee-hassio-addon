@@ -113,6 +113,11 @@ EMBEDDING_ENDPOINT="$(_bashio_config 'embedding_endpoint' '')"
 # v0.2.3: instructor mode override. Empty string means "use cognee's
 # default" (typically `json_mode` for the `generic` adapter).
 LLM_INSTRUCTOR_MODE="$(_bashio_config 'llm_instructor_mode' '')"
+# v0.4.0: graph extractor mode. auto | gliner_demo | llm
+# - auto: use LLM if configured, else fall back to GLiNER2
+# - gliner_demo: force GLiNER2 (no LLM needed for extraction)
+# - llm: force LLM-based extraction (fails if LLM not configured)
+GRAPH_EXTRACTOR="$(_bashio_config 'graph_extractor' 'auto')"
 COGNEE_PORT="$(_bashio_config 'cognee_port' '8000')"
 AGENT_MODE="$(_bashio_config 'agent_mode' 'true')"
 LOG_LEVEL="$(_bashio_config 'log_level' 'INFO')"
@@ -121,12 +126,22 @@ LOG_LEVEL="$(_bashio_config 'log_level' 'INFO')"
 ENABLE_MCP="$(_bashio_config 'enable_mcp' 'true')"
 
 # ---- Validations (fatal) ----
-if [ -z "${LLM_API_KEY}" ]; then
+# v0.4.0: LLM key is only required when graph_extractor == "llm".
+# With "auto" or "gliner_demo", an empty LLM key is fine — cognee will
+# use GLiNER2 for graph extraction instead.
+if [ "${GRAPH_EXTRACTOR}" = "llm" ] && [ -z "${LLM_API_KEY}" ]; then
     if declare -F bashio::exit.nok >/dev/null 2>&1; then
-        bashio::exit.nok "llm_api_key is empty. Set it in the add-on Configuration tab (HA UI)."
+        bashio::exit.nok "llm_api_key is empty but graph_extractor=llm. Either set an LLM key or change graph_extractor to 'auto' or 'gliner_demo'."
     else
-        echo "[10-config] FATAL: llm_api_key is empty. Set it in the add-on Configuration tab (HA UI)."
+        echo "[10-config] FATAL: llm_api_key is empty but graph_extractor=llm. Set an LLM key or change graph_extractor."
         exit 1
+    fi
+fi
+if [ -z "${LLM_API_KEY}" ] && [ "${GRAPH_EXTRACTOR}" != "llm" ]; then
+    if declare -F bashio::log.warning >/dev/null 2>&1; then
+        bashio::log.warning "llm_api_key is empty — GLiNER2 will be used for graph extraction (graph_extractor=${GRAPH_EXTRACTOR})"
+    else
+        echo "[10-config] WARN: llm_api_key is empty — GLiNER2 will be used for graph extraction (graph_extractor=${GRAPH_EXTRACTOR})"
     fi
 fi
 
@@ -168,6 +183,7 @@ export DATA_PATH LLM_API_KEY EMBEDDING_API_KEY \
        LLM_PROVIDER LLM_MODEL \
        EMBEDDING_PROVIDER EMBEDDING_MODEL \
        EMBEDDING_ENDPOINT LLM_INSTRUCTOR_MODE \
+       GRAPH_EXTRACTOR \
        ENABLE_BACKEND_ACCESS_CONTROL REQUIRE_AUTHENTICATION \
        COGNEE_PORT AGENT_MODE LOG_LEVEL ENABLE_MCP \
        SYSTEM_ROOT_DIRECTORY DATA_ROOT_DIRECTORY CACHE_ROOT_DIRECTORY
@@ -208,6 +224,7 @@ export LLM_ENDPOINT EMBEDDING_ENDPOINT
     echo "AGENT_MODE=${AGENT_MODE}"
     echo "LOG_LEVEL=${LOG_LEVEL}"
     echo "ENABLE_MCP=${ENABLE_MCP}"
+    echo "GRAPH_EXTRACTOR=${GRAPH_EXTRACTOR}"
     echo "LLM_API_KEY_LEN=${#LLM_API_KEY}"
     echo "EMBEDDING_API_KEY_LEN=${#EMBEDDING_API_KEY}"
 } > "${DATA_PATH}/logs/options.env"

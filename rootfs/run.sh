@@ -90,6 +90,48 @@ if [ -z "${LLM_ENDPOINT:-}" ] && [ -n "${LLM_BASE_URL:-}" ]; then
 fi
 export LLM_ENDPOINT
 
+# ---- v0.4.0: graph extractor resolution ----
+# cognee reads GRAPH_EXTRACTOR to choose the extraction backend.
+# - auto: cognee's default (LLM if configured, else GLiNER2)
+# - gliner_demo: force GLiNER2 regardless of LLM config
+# - llm: force LLM extraction (requires LLM_API_KEY)
+#
+# When LLM is not configured and graph_extractor is auto/gliner_demo,
+# set GRAPH_EXTRACTOR=gliner_demo so cognee uses the local GLiNER2 model
+# for entity + relation extraction (no LLM API calls).
+GRAPH_EXTRACTOR="${GRAPH_EXTRACTOR:-auto}"
+case "${GRAPH_EXTRACTOR}" in
+    gliner_demo)
+        export GRAPH_EXTRACTOR="gliner_demo"
+        echo "[run.sh] graph extractor: GLiNER2 (forced, no LLM)"
+        ;;
+    llm)
+        if [ -z "${LLM_API_KEY:-}" ]; then
+            echo "[run.sh] FATAL: graph_extractor=llm but LLM_API_KEY is empty" >&2
+            exit 1
+        fi
+        unset GRAPH_EXTRACTOR
+        echo "[run.sh] graph extractor: LLM (forced)"
+        ;;
+    auto|"")
+        if [ -z "${LLM_API_KEY:-}" ]; then
+            export GRAPH_EXTRACTOR="gliner_demo"
+            echo "[run.sh] graph extractor: GLiNER2 (LLM not configured, auto-fallback)"
+        else
+            unset GRAPH_EXTRACTOR
+            echo "[run.sh] graph extractor: auto (LLM configured)"
+        fi
+        ;;
+    *)
+        echo "[run.sh] WARN: unknown graph_extractor='${GRAPH_EXTRACTOR}', defaulting to auto" >&2
+        if [ -z "${LLM_API_KEY:-}" ]; then
+            export GRAPH_EXTRACTOR="gliner_demo"
+        else
+            unset GRAPH_EXTRACTOR
+        fi
+        ;;
+esac
+
 # Cognee data root — point all file-based backends (sqlite, kuzu, lancedb)
 # at the persistent /share/cognee mount so restart-survival is guaranteed.
 # Cognee 0.3.6 reads these three env vars (see cognee/base_config.py):

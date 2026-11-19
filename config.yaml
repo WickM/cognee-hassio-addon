@@ -16,14 +16,20 @@ backup_exclude:
   - "**/logs"
   - "**/cache"
 schema:
-  # API keys — entered in HA UI, never committed
-  llm_api_key: password
+  # API keys — optional when graph_extractor=gliner (no LLM needed)
+  llm_api_key: password?
   embedding_api_key: password?
 
-  # LLM (graph extraction, etc.)
-  llm_provider: str
-  llm_model: str
+  # LLM (graph extraction, etc.) — optional when graph_extractor=gliner
+  llm_provider: str?
+  llm_model: str?
   llm_base_url: str?
+
+  # Graph extractor — controls entity/relation extraction backend
+  # - auto: use LLM if configured, else fall back to GLiNER2
+  # - gliner_demo: force GLiNER2 (no LLM needed for extraction)
+  # - llm: force LLM-based extraction (fails if LLM not configured)
+  graph_extractor: str?
 
   # Embeddings
   embedding_provider: str
@@ -66,10 +72,16 @@ options:
   # v0.2.3 defaults: kilocode gateway + MiniMax-M3 (LLM) + Voyage-4-large (embeddings).
   # `embedding_dimensions` is intentionally NOT in `options:` — HA-UI auto-fills
   # `int?` fields with `0` if they're missing, which makes Voyage reject `dim=0`.
+  # LLM fields default to the kilocode gateway; clear them in HA-UI to use
+  # GLiNER2 for graph extraction (no LLM API key needed).
   llm_provider: custom
   llm_model: minimax/minimax-m3
   llm_base_url: https://api.kilo.ai/api/gateway/v1
   llm_instructor_mode: MD_JSON
+
+  # Graph extractor: auto | gliner_demo | llm
+  # auto (default) = use LLM if configured, else GLiNER2
+  graph_extractor: auto
 
   embedding_provider: voyageai
   embedding_model: voyage/voyage-4-large
