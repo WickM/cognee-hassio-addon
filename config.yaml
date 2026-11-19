@@ -1,5 +1,5 @@
 name: Cognee
-version: "0.4.0"
+version: "0.4.1"
 slug: cognee
 description: Cognee graph memory + retrieval API (sidecar to OpenClaw / any agent)
 url: https://github.com/WickM/cognee-hassio-addon
@@ -30,6 +30,11 @@ schema:
   # - gliner_demo: force GLiNER2 (no LLM needed for extraction)
   # - llm: force LLM-based extraction (fails if LLM not configured)
   graph_extractor: str?
+  # v0.4.1: GLINER_AUTO_INSTALL — when false, cognee will NOT try to
+  # pip-install gliner2/torch at runtime (they're pre-installed in the
+  # Docker image). Set to true only if you want cognee to self-install
+  # the GLiNER2 runtime on first use.
+  gliner_auto_install: bool?
 
   # Embeddings
   embedding_provider: str

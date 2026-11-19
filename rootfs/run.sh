@@ -100,6 +100,13 @@ export LLM_ENDPOINT
 # set GRAPH_EXTRACTOR=gliner_demo so cognee uses the local GLiNER2 model
 # for entity + relation extraction (no LLM API calls).
 GRAPH_EXTRACTOR="${GRAPH_EXTRACTOR:-auto}"
+# v0.4.1: GLINER_AUTO_INSTALL=false prevents cognee from trying to pip-install
+# gliner2/torch at runtime (the Dockerfile installs them at build time).
+# Without this, the first cognify() call blocks on a runtime install that
+# fails in the addon's read-only filesystem, leaving the pipeline stuck
+# in DATASET_PROCESSING_STARTED forever.
+export GLINER_AUTO_INSTALL="${GLINER_AUTO_INSTALL:-false}"
+
 case "${GRAPH_EXTRACTOR}" in
     gliner_demo)
         export GRAPH_EXTRACTOR="gliner_demo"

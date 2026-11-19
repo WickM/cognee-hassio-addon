@@ -131,6 +131,20 @@ RUN pip install --no-cache-dir \
         "sentencepiece>=0.2.0" \
         "torch<3,>=2.1"
 
+# v0.4.1: Pre-load the GLiNER2 model (~750 MB) at build time so the first
+# cognify() call doesn't block on a runtime download. The model lands in
+# the Hugging Face cache; cognee finds it there on first use.
+# GLINER_AUTO_INSTALL=false in run.sh prevents cognee from trying to
+# pip-install gliner2/torch at runtime (the Dockerfile already installed
+# them). Without the pre-load, the pipeline hangs in
+# DATASET_PROCESSING_STARTED forever.
+RUN HF_HOME=/root/.cache/huggingface python3 -c "\
+import os; \
+os.environ['HF_HOME'] = '/root/.cache/huggingface'; \
+from gliner2 import GLiNER2; \
+model = GLiNER2('fastino/gliner2.5-base-v1'); \
+print(f'GLiNER2 model pre-loaded: {model}')"
+
 COPY rootfs /
 
 ENTRYPOINT ["/init"]
