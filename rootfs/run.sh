@@ -154,7 +154,7 @@ export CACHE_ROOT_DIRECTORY="${DATA_PATH}/.cognee_cache"
 export HOME="${DATA_PATH}"
 # Create all three before uvicorn starts (pydantic-settings validates
 # that they're absolute; cognee's lifespan will fail if dirs missing).
-mkdir -p "${SYSTEM_ROOT_DIRECTORY}" "${DATA_ROOT_DIRECTORY}" "${CACHE_ROOT_DIRECTORY}" "${DATA_PATH}/.data" "${DATA_PATH}/logs"
+mkdir -p "${SYSTEM_ROOT_DIRECTORY}" "${DATA_ROOT_DIRECTORY}" "${CACHE_ROOT_DIRECTORY}" "${DATA_PATH}/.data" "${DATA_PATH}/logs" "${DATA_PATH}/.huggingface"
 
 # ---- Launch ----
 PY="$(command -v python || command -v python3)"
