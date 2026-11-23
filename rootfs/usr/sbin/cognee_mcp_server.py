@@ -22,11 +22,27 @@ from typing import Optional
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 COGNEE_BASE = os.environ.get("COGNEE_BASE_URL", "http://localhost:8000/api/v1")
 HTTP_TIMEOUT = httpx.Timeout(connect=10, read=300, write=30, pool=10)
 
-mcp = FastMCP("cognee")
+# DNS-rebinding protection (mcp SDK auto-enables this when host is localhost
+# or 127.0.0.1, with a fixed allow-list of only 127.0.0.1/localhost/::1).
+# That makes the SSE endpoint reject every non-loopback Host header with
+# 421 — including the HA bridge IP (172.30.32.1:8000) and the LAN IP
+# (192.168.0.6:8000) that Cline / Kilo / OpenClaw send from outside the
+# container. Setting an explicit TransportSecuritySettings with an empty
+# allowed_hosts list disables the check entirely (see SDK
+# TransportSecurityMiddleware.__init__: `settings or
+# TransportSecuritySettings(enable_dns_rebinding_protection=False)`).
+# The addon is only reachable inside the trusted home network.
+mcp = FastMCP(
+    "cognee",
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False
+    ),
+)
 
 
 # ---------------------------------------------------------------------------

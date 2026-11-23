@@ -5,6 +5,29 @@ All notable changes to this add-on are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-11-22
+
+### Fixed — MCP SSE endpoint rejected every non-loopback Host header (421)
+
+The MCP SSE endpoint (`/sse`, `/messages/`) returned `421 Invalid Host header`
+to every client that connected through a non-loopback Host — i.e. the HA
+bridge IP (`172.30.32.1:8000`) or the LAN IP (`192.168.0.6:8000`) that Cline,
+Kilo Code, or any external MCP client sends. Root cause: the `mcp` SDK
+auto-enables DNS-rebinding protection when `FastMCP` runs with its default
+`host="127.0.0.1"`, and its allow-list is fixed to `127.0.0.1:*`, `localhost:*`,
+`[::1]:*`. Every other Host header is rejected before the SSE handshake.
+
+Fix: construct `FastMCP` with an explicit `TransportSecuritySettings(
+enable_dns_rebinding_protection=False)` so the check is disabled. The add-on
+is only reachable inside the trusted home network, so the protection is not
+needed. Verified via the SDK source (`TransportSecurityMiddleware.__init__`
+treats `settings or TransportSecuritySettings(enable_dns_rebinding_protection=False)`
+as the disabled default).
+
+No config or REST surface changed; `/health`, `/docs`, and cognee's REST API
+were already reachable with non-loopback Host headers — only the MCP SSE route
+was affected.
+
 ## [0.3.3] - 2026-10-01
 
 ### Changed — Cognee 1.4.2 → 1.6.1
